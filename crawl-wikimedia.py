@@ -4,6 +4,7 @@
 # saves raw data to wiki-dl-raw and formatted (\0 separated) to wiki-dl
 """
 import os
+import sys
 import re
 import time
 import requests
@@ -69,7 +70,7 @@ def gather_titles(searches, sroffset_start=0, sroffset_max=400):
                     titles.append(title)
             time.sleep(0.33)
             sroffset += 10
-
+    return titles
 
 def download_and_transform_wikipage(titles):
     print('*'*80)
@@ -119,12 +120,12 @@ def download_and_transform_wikipage(titles):
                 print('write-error: {}'.format(err))
         time.sleep(0.33)
 
-def main():
+def main(limit=30, sroffset_max=100):
     create_wiki_dirs()
     download_dictionary()
-    searches = build_search_list(limit=200)
-    titles = gather_titles(searches, sroffset_start=0, sroffset_max=400)
+    searches = build_search_list(limit=limit)
+    titles = gather_titles(searches, sroffset_start=0, sroffset_max=sroffset_max)
     download_and_transform_wikipage(titles)
 
 if __name__ == '__main__':
-    main()
+    main(limit=int(sys.argv[1]), sroffset_max=int(sys.argv[2]))
