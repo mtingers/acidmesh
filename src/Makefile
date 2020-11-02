@@ -7,11 +7,16 @@ default: tests
 tests: wordbank.o util.o forest.o
 	$(CC) $(CFLAGS) util.o wordbank.o forest.c -DTEST_FOREST -o ../test_forest
 	$(CC) $(CFLAGS) util.o forest.o wordbank.c -DTEST_WORDBANK -o ../test_wordbank
+	$(CC) $(CFLAGS) util.o forest.o wordbank.o context.c -DTEST_CONTEXT -o ../test_context
 	cp -v ../test_forest ../bin/
 	cp -v ../test_wordbank ../bin/
+	cp -v ../test_context ../bin/
 
 util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c
+
+context.o: context.c context.h
+	$(CC) $(CFLAGS) -c context.c
 
 forest.o:  forest.c forest.h
 	$(CC) $(CFLAGS) -c forest.c

@@ -10,15 +10,6 @@
 #include "wordbank.h"
 #include "util.h"
 
-void newline2space(char *s, size_t s_len)
-{
-    size_t i = 0;
-    for(; i < s_len; i++) {
-        if(s[i] == '\n') {
-            s[i] = ' ';
-        }
-    }
-}
 
 struct forest *forest_new()
 {
@@ -166,6 +157,7 @@ void forest_dump(struct forest *f)
 }
 
 #if TEST_FOREST
+#define BUF_SIZE 1024*1024*4
 void forest_test(void)
 {
     struct word_bank *wb = wb_new();
@@ -182,7 +174,7 @@ void forest_test(void)
     char *txt = NULL;
     size_t fsize = 0;
     FILE *fd = NULL;
-    char *buf = safe_malloc(sizeof(*buf)*8192, __LINE__);
+    char *buf = safe_malloc(sizeof(*buf)*BUF_SIZE, __LINE__);
     size_t buf_i = 0, x = 0;
     char *tests[] = {
         "Kidney transplantation or renal transplantation "
@@ -312,13 +304,16 @@ void forest_test(void)
                 }
                 free(str);
                 str = NULL;
+            } else if(buf_i >= BUF_SIZE) {
+                fprintf(stderr, "WARNING: Buffer overflow, skipping some data.\n");
+                break;
             }
         }
         free(txt);
     }
     free(namelist);
     wb_dump_tree(wb->words, 1);
-    forest_dump(f);
+    //forest_dump(f);
     wb_free(wb);
     printf("STATS: word_bank_size:%lu forest_root_size:%lu\n", wb->count, f->count);
 }

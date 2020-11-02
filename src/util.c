@@ -32,3 +32,13 @@ void safe_free(void *p, int lineno)
     p = NULL;
 }
 
+void newline2space(char *s, size_t s_len)
+{
+    size_t i = 0;
+    for(; i < s_len; i++) {
+        if(s[i] == '\n') {
+            s[i] = ' ';
+        }
+    }
+}
+

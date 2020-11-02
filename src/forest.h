@@ -23,5 +23,16 @@ struct forest {
     struct tree **trees;
 };
 
+struct forest *forest_new();
+struct tree *tree_new(size_t index, size_t root_index);
+void tree_insert_prev(struct tree *cur, struct tree *prev);
+void tree_insert_next(struct tree *cur, struct tree *prev);
+void forest_expand(struct forest *f, struct tree *tree_series);
+/*struct tree *forest_find_depth_else_new(struct word_bank *wb,
+        struct forest *f, const char *word, size_t word_len, size_t depth,
+        struct tree *prev, size_t root_index);
+*/
+void forest_dump(struct forest *f);
+
 #endif
 
