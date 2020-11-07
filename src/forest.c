@@ -4,6 +4,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <assert.h>
+#include <time.h>
 #include "util.h"
 #include "forest.h"
 #include "wordbank.h"
@@ -21,23 +22,37 @@ struct forest *forest_init()
 
 void tree_add_parent(struct tree *t, struct tree *parent)
 {
-    size_t i = 0;
+    int rc;
+    struct container *cur;
     if(!t->parents) {
-        t->parents = safe_malloc(sizeof(*t->parents), __LINE__);
-        t->parents[0] = parent;
-        t->parents_len++;
+        t->parents = container_init();
+        t->parents->tree = parent;
         return;
     }
-    for(i = 0; i < t->parents_len; i++) {
-        if(parent->depth == t->parents[i]->depth && strcmp(parent->word->data, t->parents[i]->word->data) == 0) {
-            // this exists already, nothing to do
+    cur = t->parents;
+    while(cur) {
+        rc = strcmp(cur->tree->word->data, parent->word->data);
+        if(rc > 0) {
+            if(!cur->right) {
+                cur->right = container_init();
+                cur->right->tree = parent;
+                return;
+            }
+            cur = cur->right;
+        } else if(rc < 0) {
+            if(!cur->left) {
+                cur->left = container_init();
+                cur->left->tree = parent;
+                return;
+            }
+            cur = cur->left;
+        } else {
+            //exists
             return;
         }
     }
-    // does not exist yet, so must expand and add it to the end
-    t->parents_len++;
-    t->parents = safe_realloc(t->parents, sizeof(*t->parents)*(t->parents_len), __LINE__);
-    t->parents[t->parents_len-1] = parent;
+    fprintf(stderr, "ERROR: tree_add_parent() failed due to programmer error.\n");
+    exit(1);
 }
 
 struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree, struct tree *parent_tree)
@@ -163,7 +178,8 @@ struct tree *tree_init(struct word *w, size_t depth)
 {
     struct tree *t = safe_malloc(sizeof(*t), __LINE__);
     t->depth = depth;
-    t->parents_len = 0;
+    //t->parents_len = 0;
+    //t->parents_depth_len = NULL;
     t->parents = NULL;
     //t->parents = safe_malloc(sizeof(*t->parents), __LINE__);
     //t->parents[0] = parent;
@@ -205,6 +221,12 @@ void test_forest(const char *data_directory)
     size_t buf_i = 0, x = 0;
     size_t i = 0;
     int nn = 0;
+    clock_t start, end;
+    double cpu_time_used;
+    double cpu_time_avg = 0.0;
+    double cpu_time_total = 0.0;
+    double cpu_time_max = 0.0;
+    double cpu_time_min = 9999999999999999.9;
 
     n = scandir(data_directory, &namelist, NULL, alphasort);
     nn = n;
@@ -214,15 +236,15 @@ void test_forest(const char *data_directory)
         exit(1);
     }
     DEBUG_PRINT(("Start file read loop...\n"));
-    n = (int)(n/4);
+    // use partial: n = (int)(n/4);
     while (n--) {
-
         find = strstr(namelist[n]->d_name, ".dl");
         if(!find)
             continue;
         if(n % 1000 == 0) {
             printf("%d/%d: word-count:%lu\n", nn-n, nn, f->wb->count);
         }
+        start = clock();
         fd = file_open(namelist[n]->d_name, "rb", 1);
         if(fd->size < 5) {
             fd->close(fd);
@@ -263,7 +285,15 @@ void test_forest(const char *data_directory)
         }
         free(fd);
         free(txt);
+        end = clock();
+        cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        cpu_time_total += cpu_time_used;
+        if(cpu_time_used > cpu_time_max)
+            cpu_time_max = cpu_time_used;
+        if(cpu_time_used < cpu_time_min)
+            cpu_time_min = cpu_time_used;
     }
+    cpu_time_avg = cpu_time_total/(double)nn;
     free(namelist);
     parent_tree = NULL;
     // add words to wordbank
@@ -292,6 +322,7 @@ void test_forest(const char *data_directory)
     t = tree_insert(f, "from", 5, t, parent_tree);
     t = tree_insert(f, "tree_insert.", 6, t, parent_tree);
     dump_tree(f);
+    printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n", cpu_time_total, cpu_time_avg, cpu_time_min, cpu_time_max);
 }
 
 int main(int argc, char **argv)

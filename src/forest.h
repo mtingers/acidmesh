@@ -3,8 +3,7 @@
 
 struct tree {
     size_t depth;
-    struct tree **parents;
-    size_t parents_len;
+    struct container *parents;
     struct word *word;
     size_t prev_len;
     size_t next_len;
