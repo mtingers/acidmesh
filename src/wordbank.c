@@ -7,204 +7,122 @@
 #include "wordbank.h"
 #include "forest.h"
 
-struct wb_word *word_new(const char *word, size_t word_len)
+struct word *word_init(const char *data)
 {
-    struct wb_word *w = safe_malloc(sizeof(*w), __LINE__);
-    w->len = word_len;
-    w->trees_len = 0;
-    w->data = safe_malloc(word_len+1, __LINE__);
-    w->trees = NULL;
+    struct word *w = safe_malloc(sizeof(*w), __LINE__);
     w->left = NULL;
     w->right = NULL;
-    memcpy(w->data, word, word_len);
-    w->data[word_len] = '\0';
+    w->trees_len = 0;
+    w->trees = NULL;
+    w->data = safe_malloc(strlen(data)+1, __LINE__);
+    memcpy(w->data, data, strlen(data));
+    w->data[strlen(data)] = '\0';
     return w;
+
 }
 
-struct word_bank *wb_new()
+struct wordbank *wordbank_init()
 {
-    struct word_bank *wb = safe_malloc(sizeof(*wb), __LINE__);
-    wb->count = 0;
-    wb->words = NULL;
+    struct wordbank *wb = safe_malloc(sizeof(*wb), __LINE__);
+    wb->count = 1;
+    wb->words = word_init("]");
     return wb;
 }
 
-void wb_free_branch(struct wb_word *w)
-{
-    struct wb_word *cur;
-    if(!w) {
-        fprintf(stderr, "ERROR: wb_free_branch(): programmer error\n");
-        return;
-    }
-    cur = w;
-    if(cur->left) {
-        wb_free_branch(cur->left);
-    }
-    if(cur->right) {
-        wb_free_branch(cur->right);
-    }
-    safe_free(cur->data, __LINE__);
-    if(cur->trees)
-        safe_free(cur->trees, __LINE__);
-    safe_free(cur, __LINE__);
-    w = NULL;
-}
-
-// Free all words and then itself
-// Keep forest intact
-void wb_free(struct word_bank *wb)
-{
-    assert(wb);
-    if(wb->words) {
-        wb_free_branch(wb->words);
-    }
-    wb->words = NULL;
-    safe_free(wb, __LINE__);
-}
-
-struct tree *wb_insert_tree(struct wb_word *w, struct tree *t, const char *word, size_t word_len)
+void word_add_tree(struct word *w, struct tree *t)
 {
     size_t i = 0;
-    assert(t);
-    // resize trees and append new tree
-    if(!w->trees) {
-        w->trees = safe_malloc(sizeof(*w->trees), __LINE__);
-        w->trees_len = 1;
-        w->trees[0] = t;
-        w->trees[0]->word = w;
-        return w->trees[0];
-    // trees has items, so append to it
-    } else {
-        // need to lookup this word to see if it already exists in the trees
-        // if not, then add it
-        for(i = 0; i < w->trees_len; i++) {
-            if(strcmp(w->trees[i]->word->data, word) == 0 && w->trees[i]->index == t->index && w->trees[i]->root_index == t->root_index) {
-                return w->trees[i];
+    if(t->depth+1 > w->trees_len) {
+        if(!w->trees) {
+            //printf("word_add_tree(): first-ref\n");
+            // no references exist at this depth, so allocate to this depth
+            // then NULL out those that don't exist yet
+            w->trees = safe_malloc(sizeof(*w->trees)*(t->depth+1), __LINE__);
+            for(i = 0; i < t->depth; i++) {
+                w->trees[i] = NULL;
             }
+        } else {
+            //printf("word_add_tree(): ref-expand\n");
+            w->trees = safe_realloc(w->trees, sizeof(*w->trees)*(t->depth+1), __LINE__);
         }
-        w->trees = safe_realloc(w->trees, sizeof(*w->trees)*(w->trees_len+1), __LINE__);
-        w->trees[w->trees_len] = t;
-        w->trees[w->trees_len]->word = w;
-        w->trees_len++;
-        return w->trees[w->trees_len-1];
+        w->trees[t->depth] = t;
+        w->trees_len = t->depth+1;
+    } else {
+        // this depth exists, so we must check if it's NULL and add if so
+        if(!w->trees[t->depth]) {
+            //printf("word_add_tree(): ref-replace-null\n");
+            w->trees[t->depth] = t;
+        } else {
+            //printf("word_add_tree(): ref-exists\n");
+        }
     }
-    return NULL;
 }
 
-struct wb_word *wb_insert(struct word_bank *wb, const char *word, size_t word_len)
+struct word *word_insert(struct forest *f, const char *data)
 {
-    struct wb_word *cur = NULL;
-    int rc = 0;
-    assert(wb);
-    assert(word_len > 0);
-    cur = wb->words;
-    // find the next open slot
-    if(!cur) {
-        // this means it is the first word being inserted
-        wb->words = word_new(word, word_len);
-        wb->count++;
-        return wb->words;
-    }
-    // not first item, so we must traverse the tree to find match or next
-    // location to create one
+    return _word_insert(f->wb, data);
+}
+
+struct word *_word_insert(struct wordbank *wb, const char *data)
+{
+    int rc;
+    struct word *cur = wb->words;
+    assert(wb->words != NULL);
     while(cur) {
-        rc = strcmp(cur->data, word);
-        if(rc == 0) {
-            // this is a match, just return;
-            return cur;
-        }
-        if(rc > 0) {
+        rc = strcmp(data, cur->data);
+        if(rc < 0) {
+            if(!cur->left) {
+                cur->left = word_init(data);
+                wb->count++;
+                return cur->left;
+            }
+            cur = cur->left;
+        } else if(rc > 0) {
             if(!cur->right) {
-                cur->right = word_new(word, word_len);
+                cur->right = word_init(data);
                 wb->count++;
                 return cur->right;
             }
             cur = cur->right;
         } else {
-            if(!cur->left) {
-                cur->left = word_new(word, word_len);
-                wb->count++;
-                return cur->left;
-            }
-            cur = cur->left;
+            // exists, skip
+            return cur;
         }
     }
-    fprintf(stderr, "ERROR: wb_insert() programmer error.  Exiting.\n");
+    fprintf(stderr, "ERROR: word_insert() failed due to programmer error.\n");
     exit(1);
 }
 
-struct wb_word *wb_find(struct word_bank *wb, const char *word, size_t word_len)
+struct word *word_find(struct forest *f, const char *data)
 {
-    struct wb_word *cur = NULL;
-    int rc = 0;
-    assert(wb);
-    assert(word_len > 0);
-    cur = wb->words;
-    if(!cur) {
-        return NULL;
-    }
+    int rc;
+    struct word *cur = f->wb->words;
+    assert(f->wb->words);
     while(cur) {
-        rc = strcmp(cur->data, word);
-        if(rc == 0) {
-            return cur;
-        }
-        if(rc > 0) {
+        rc = strcmp(data, cur->data);
+        if(rc < 0) {
+            cur = cur->left;
+        } else if(rc > 0) {
             cur = cur->right;
         } else {
-            cur = cur->left;
+            return cur;
         }
     }
     return NULL;
 }
 
-void wb_dump_tree(struct wb_word *w, int depth)
+void dump_words(struct word *w, size_t indent)
 {
-    int i = 0;
-    for(; i < depth*2; i++) {
+    size_t i = 0;
+    for(i = 0; i < indent*2; i++) {
         printf(" ");
     }
-    if(w->len > 0) {
-        printf("%s\n", w->data);
+    printf("%s\n", w->data);
+    if(w->left) {
+        dump_words(w->left, indent+1);
     }
     if(w->right) {
-        wb_dump_tree(w->right, depth+1);
-    }
-    if(w->left) {
-        wb_dump_tree(w->left, depth+1);
+        dump_words(w->right, indent+1);
     }
 }
-
-void wb_test()
-{
-    struct word_bank *wb = wb_new();
-    size_t i = 0;
-    char *words1[] = {
-        "Hi,", "this", "is", "really", "the", "end", "of", "the", "world!"
-    };
-    char *words2[] = {
-        "Kidney", "transplantation", "or", "renal", "transplantation", ""
-        "is", "the", "organ", "transplant", "of", "a", "kidney", "into", "a", ""
-        "patient", "with", "end-stage", "kidney", "disease.",
-    };
-
-    wb_insert(wb, "]", 1);
-    for(i = 0; i < sizeof(words1)/sizeof(*words1); i++) {
-        printf("i: %lu %s\n", i, words1[i]);
-        wb_insert(wb, words1[i], strlen(words1[i]));
-    }
-    for(i = 0; i < sizeof(words2)/sizeof(*words2); i++) {
-        printf("i: %lu %s\n", i, words2[i]);
-        wb_insert(wb, words2[i], strlen(words2[i]));
-    }
-    wb_dump_tree(wb->words, 1);
-    wb_free(wb);
-}
-
-#if TEST_WORDBANK
-int main(void)
-{
-    wb_test();
-    return 0;
-}
-#endif
 

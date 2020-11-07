@@ -54,3 +54,6 @@ dkms.conf
 
 *.dl
 bin/
+.DS_Store
+*RC_*
+*_RC_*

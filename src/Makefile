@@ -1,22 +1,20 @@
 
-CFLAGS=-Wall -O2
+CFLAGS=-Wall -O3
 CC=cc
 
 default: tests
 
-tests: wordbank.o util.o forest.o
-	$(CC) $(CFLAGS) util.o wordbank.o forest.c -DTEST_FOREST -o ../test_forest
-	$(CC) $(CFLAGS) util.o forest.o wordbank.c -DTEST_WORDBANK -o ../test_wordbank
-	$(CC) $(CFLAGS) util.o forest.o wordbank.o context.c -DTEST_CONTEXT -o ../test_context
-	cp -v ../test_forest ../bin/
-	cp -v ../test_wordbank ../bin/
-	cp -v ../test_context ../bin/
+debug: wordbank.o util.o forest.o container.o
+	$(CC) $(CFLAGS) util.o wordbank.o container.o forest.c -DTEST_FOREST -D DEBUG -o ../bin/test_forest
+
+tests: wordbank.o util.o forest.o container.o
+	$(CC) $(CFLAGS) util.o wordbank.o container.o forest.c -DTEST_FOREST  -o ../bin/test_forest
 
 util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c
 
-context.o: context.c context.h
-	$(CC) $(CFLAGS) -c context.c
+container.o: container.c container.h
+	$(CC) $(CFLAGS) -c container.c
 
 forest.o:  forest.c forest.h
 	$(CC) $(CFLAGS) -c forest.c
@@ -25,4 +23,4 @@ wordbank.o:  wordbank.c wordbank.h
 	$(CC) $(CFLAGS) -c wordbank.c
 
 clean:
-	rm -v *.o ../test_forest ../test_wordbank
+	rm -v *.o 
