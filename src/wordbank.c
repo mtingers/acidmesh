@@ -34,7 +34,6 @@ void word_add_tree(struct word *w, struct tree *t)
     size_t i = 0;
     if(t->depth+1 > w->trees_len) {
         if(!w->trees) {
-            //printf("word_add_tree(): first-ref\n");
             // no references exist at this depth, so allocate to this depth
             // then NULL out those that don't exist yet
             w->trees = safe_malloc(sizeof(*w->trees)*(t->depth+1), __LINE__);
@@ -42,7 +41,6 @@ void word_add_tree(struct word *w, struct tree *t)
                 w->trees[i] = NULL;
             }
         } else {
-            //printf("word_add_tree(): ref-expand\n");
             w->trees = safe_realloc(w->trees, sizeof(*w->trees)*(t->depth+1), __LINE__);
         }
         w->trees[t->depth] = t;
@@ -50,10 +48,7 @@ void word_add_tree(struct word *w, struct tree *t)
     } else {
         // this depth exists, so we must check if it's NULL and add if so
         if(!w->trees[t->depth]) {
-            //printf("word_add_tree(): ref-replace-null\n");
             w->trees[t->depth] = t;
-        } else {
-            //printf("word_add_tree(): ref-exists\n");
         }
     }
 }
@@ -85,7 +80,7 @@ struct word *_word_insert(struct wordbank *wb, const char *data)
             }
             cur = cur->right;
         } else {
-            // exists, skip
+            // exists, skip inserting new
             return cur;
         }
     }

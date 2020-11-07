@@ -19,7 +19,6 @@ struct forest *forest_init()
     return f;
 }
 
-
 struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree)
 {
     int rc;
@@ -29,7 +28,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
     struct tree *return_tree = NULL;
     struct container *cur = NULL;
     int has_been_linked = 0;
-    
+
     DEBUG_PRINT(("tree_insert(): data=%s depth=%lu prev_tree:%s\n",
         data, depth, (prev_tree) ? "yes" : "no"));
 
@@ -62,7 +61,6 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         // the container tree by word. Traverse the binary tree.
         cur = f->containers[depth];
         while(cur) {
-            //DEBUG_PRINT(("while(cur): %s <> %s\n", cur->tree->word->data, data));
             rc = strcmp(cur->tree->word->data, data);
             if(rc < 0) {
                 if(!cur->left) {
@@ -71,7 +69,6 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
                     cur->left->tree = t;
                     return_tree = cur->left->tree;
                     break;
-                    //return cur->left->tree;
                 }
                 cur = cur->left;
             } else if (rc > 0) {
@@ -81,7 +78,6 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
                     cur->right->tree = t;
                     return_tree = cur->right->tree;
                     break;
-                    //return cur->right->tree;
                 }
                 cur = cur->right;
             } else {
@@ -89,7 +85,6 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
                 DEBUG_PRINT(("while(cur): found\n"));
                 return_tree = cur->tree;
                 break;
-                //return cur->tree;
             }
         }
     }
@@ -130,7 +125,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         t->parent = t; // point to self
     }
     // Add this tree reference (word at this depth) to the word itself for
-    // reverse lookups from just a word.
+    // reverse lookups from a word.
     word_add_tree(w, return_tree);
     return return_tree;
 }
@@ -176,88 +171,24 @@ void test_forest(const char *data_directory)
     struct file *fd;
     char *buf = safe_malloc(sizeof(*buf)*BUF_SIZE, __LINE__);
     size_t buf_i = 0, x = 0;
-    size_t j = 0, i = 0;
-    char *tests[] = {
-        "Kidney transplantation or renal transplantation "
-        "is the organ transplant of a kidney into a "
-        "patient with end-stage kidney disease.",
+    size_t i = 0;
+    int nn = 0;
 
-        "Kidney transplantation is typically classified "
-        "as deceased-donor (formerly known as cadaveric) or "
-        "living-donor transplantation depending if the source "
-        "of the donor organ.",
-
-        "Kidney transplantation is typically classified "
-        "as deceased-donor (formerly known as cadaveric) or "
-        "living-donor transplantation depending on the source "
-        "of the donor organ.",
-
-        "Kidney transplantation or renal transplantation "
-        "is the organ transplant of a kidney onto a "
-        "patient with end-stage kidney disease.",
-
-        "Hi, this is really the end of the world!",
-
-        "Where are we going with all of this?",
-
-        "William Henry Kibby was born at Winlaton, County Durham, UK, on 15 "
-        "April 1903.",
-
-        "The second of three children, Kibby was born to John "
-        "Robert Kibby, a draper's assistant, and Mary Isabella Kibby née "
-        "Birnie.",
-
-        "He had two sisters. In early 1914, the Kibby family emigrated "
-        "to Adelaide, South Australia.",
-
-        "Bill attended Mitcham Public School and "
-        "then held various jobs before securing a position at the Perfection "
-        "Fibrous Plaster Works in Edwardstown.",
-
-        "There, he worked as an interior decorator, designing and fixing "
-        "plaster decorations.",
-
-        "He married Mabel Sarah Bidmead Morgan in 1926; they lived at "
-        "Helmsdale (now Glenelg East) and had two daughters.",
-
-        "The 2020 Aegean Sea earthquake was a magnitude 7.0 earthquake which "
-        "struck on Friday, 30 October 2020, about 14 km (8.7 mi) northeast of "
-        "the island of Samos, Greece.",
-    };
-
-    for(j = 0; j < sizeof(tests)/sizeof(*tests); j++) {
-        token = NULL;
-        str = strdup(tests[j]);
-        i = 0;
-        t = NULL;
-        for(token = strtok_r(str, " ", &rest); token != NULL; token = strtok_r(NULL, " ", &rest)) {
-            t = tree_insert(f, token, i, t);
-            i++;
-        }
-        free(str);
-        str = NULL;
-    }
     n = scandir(data_directory, &namelist, NULL, alphasort);
+    nn = n;
     chdir(data_directory);
-    //n = scandir("reddit/reddit-dl", &namelist, NULL, alphasort);
-    //chdir("reddit/reddit-dl");
-    int nn = n;
     if(n == -1) {
         perror("scandir");
         exit(1);
     }
     DEBUG_PRINT(("Start file read loop...\n"));
     while (n--) {
-
         find = strstr(namelist[n]->d_name, ".dl");
         if(!find)
             continue;
         if(n % 1000 == 0) {
-            printf("%d/%d: nwords:%lu\n", nn-n, nn, f->wb->count);
-            //printf("STATS: %d/%d word_bank_size:%lu forest_root_size:%lu ts1:%.3f ts2:%.3f\n", nn-n, n+(nn-n), wb->count, f->count, time_spent_1, time_spent_2);
-
+            printf("%d/%d: word-count:%lu\n", nn-n, nn, f->wb->count);
         }
-        //printf("dirlist[%lu]: %s\n", n, namelist[n]->d_name);
         fd = file_open(namelist[n]->d_name, "rb", 1);
         if(fd->size < 5) {
             fd->close(fd);
@@ -278,7 +209,6 @@ void test_forest(const char *data_directory)
                 token = NULL;
                 rest = NULL;
                 str = strdup(buf);
-                //str = buf;
                 i = 0;
                 t = NULL;
                 for(token = strtok_r(str, " ", &rest); token != NULL; token = strtok_r(NULL, " ", &rest)) {
@@ -287,7 +217,7 @@ void test_forest(const char *data_directory)
                 }
                 free(str);
                 str = NULL;
-                //memset(buf, '\0', sizeof(*buf)*BUF_SIZE);
+                memset(buf, '\0', sizeof(*buf)*BUF_SIZE);
             } else if(buf_i >= BUF_SIZE) {
                 fprintf(stderr, "WARNING: Buffer overflow, skipping some data.\n");
                 break;
@@ -308,7 +238,6 @@ void test_forest(const char *data_directory)
     w = word_insert(f, "we");
     w = word_insert(f, "going");
     w = word_insert(f, "tonight?");
-    // insert tree at levels 0-4 using the inserted words
     // (tree_insert does word find/create internally)
     t = tree_insert(f, "What", 0, NULL);
     t = tree_insert(f, "is", 1, t);
@@ -317,10 +246,12 @@ void test_forest(const char *data_directory)
     t = tree_insert(f, "food?", 4, t);
     // example of having tree_insert create non-existent words
     t = tree_insert(f, "This", 0, NULL);
-    t = tree_insert(f, "is", 1, t);
-    t = tree_insert(f, "a", 2, t);
-    t = tree_insert(f, "new", 3, t);
-    t = tree_insert(f, "one.", 4, t);
+    t = tree_insert(f, "has", 1, t);
+    t = tree_insert(f, "new", 2, t);
+    t = tree_insert(f, "words", 3, t);
+    t = tree_insert(f, "created", 4, t);
+    t = tree_insert(f, "from", 5, t);
+    t = tree_insert(f, "tree_insert.", 6, t);
     dump_tree(f);
 }
 
