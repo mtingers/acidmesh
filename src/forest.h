@@ -3,7 +3,8 @@
 
 struct tree {
     size_t depth;
-    struct tree *parent;
+    struct tree **parents;
+    size_t parents_len;
     struct word *word;
     size_t prev_len;
     size_t next_len;
@@ -19,7 +20,9 @@ struct forest {
 
 struct forest *forest_init();
 void dump_tree(struct forest *f);
-struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree);
-struct tree *tree_init(struct word *w, struct tree *parent, size_t depth);
+struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree, struct tree *parent_tree);
+//struct tree *tree_init(struct word *w, struct tree *parent, size_t depth);
+struct tree *tree_init(struct word *w, size_t depth);
+void tree_add_parent(struct tree *t, struct tree *parent);
 
 #endif

@@ -19,7 +19,28 @@ struct forest *forest_init()
     return f;
 }
 
-struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree)
+void tree_add_parent(struct tree *t, struct tree *parent)
+{
+    size_t i = 0;
+    if(!t->parents) {
+        t->parents = safe_malloc(sizeof(*t->parents), __LINE__);
+        t->parents[0] = parent;
+        t->parents_len++;
+        return;
+    }
+    for(i = 0; i < t->parents_len; i++) {
+        if(parent->depth == t->parents[i]->depth && strcmp(parent->word->data, t->parents[i]->word->data) == 0) {
+            // this exists already, nothing to do
+            return;
+        }
+    }
+    // does not exist yet, so must expand and add it to the end
+    t->parents_len++;
+    t->parents = safe_realloc(t->parents, sizeof(*t->parents)*(t->parents_len), __LINE__);
+    t->parents[t->parents_len-1] = parent;
+}
+
+struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree, struct tree *parent_tree)
 {
     int rc;
     size_t i = 0;
@@ -46,7 +67,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         f->containers[depth] = container_init();
     }
 
-    t = tree_init(w, prev_tree, depth);
+    t = tree_init(w, depth);
     DEBUG_PRINT(("tree_insert(): tree_init(): %s %lu\n", t->word->data, depth));
 
     if(!f->containers[depth]->tree) {
@@ -115,14 +136,22 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
             t->prevs[t->prev_len] = t;
             t->prev_len++;
             // copy prev parent, this inherets down the tree for quick lookup
-            t->parent = prev_tree->parent;
+            // note that this tree can have multiple parents on how it got to
+            // this depth
+            // (see below: tree_add_parent)
+            //t->parent = prev_tree->parent;
         } else {
             DEBUG_PRINT(("tree_insert(): found-link\n"));
         }
     } else {
         DEBUG_PRINT(("tree_insert(): !!prev_tree\n"));
         // this inherets down the tree for quick lookup
-        t->parent = t; // point to self
+        //t->parent = t; // point to self
+    }
+    if(parent_tree) {
+        tree_add_parent(return_tree, parent_tree);
+    } else {
+        tree_add_parent(return_tree, return_tree);
     }
     // Add this tree reference (word at this depth) to the word itself for
     // reverse lookups from a word.
@@ -130,11 +159,14 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
     return return_tree;
 }
 
-struct tree *tree_init(struct word *w, struct tree *parent, size_t depth)
+struct tree *tree_init(struct word *w, size_t depth)
 {
     struct tree *t = safe_malloc(sizeof(*t), __LINE__);
     t->depth = depth;
-    t->parent = parent;
+    t->parents_len = 0;
+    t->parents = NULL;
+    //t->parents = safe_malloc(sizeof(*t->parents), __LINE__);
+    //t->parents[0] = parent;
     t->word = w;
     t->prev_len = 0;
     t->next_len = 0;
@@ -150,7 +182,7 @@ void dump_tree(struct forest *f)
         dump_container(f->containers[i], i, 0);
     }
     dump_words(f->wb->words, 0);
-    printf("Total word: %lu\n", f->wb->count);
+    printf("Total words: %lu\n", f->wb->count);
 }
 
 
@@ -160,7 +192,7 @@ void test_forest(const char *data_directory)
 {
     struct forest *f = forest_init();
     struct word *w;
-    struct tree *t;
+    struct tree *t, *parent_tree = NULL;
     char *token = NULL;
     char *rest = NULL;
     char *str = NULL;
@@ -182,7 +214,9 @@ void test_forest(const char *data_directory)
         exit(1);
     }
     DEBUG_PRINT(("Start file read loop...\n"));
+    n = (int)(n/4);
     while (n--) {
+
         find = strstr(namelist[n]->d_name, ".dl");
         if(!find)
             continue;
@@ -211,9 +245,13 @@ void test_forest(const char *data_directory)
                 str = strdup(buf);
                 i = 0;
                 t = NULL;
+                parent_tree = NULL;
                 for(token = strtok_r(str, " ", &rest); token != NULL; token = strtok_r(NULL, " ", &rest)) {
-                    t = tree_insert(f, token, i, t);
+                    t = tree_insert(f, token, i, t, parent_tree);
                     i++;
+                    if(!parent_tree) {
+                        parent_tree = t;
+                    }
                 }
                 free(str);
                 str = NULL;
@@ -227,6 +265,7 @@ void test_forest(const char *data_directory)
         free(txt);
     }
     free(namelist);
+    parent_tree = NULL;
     // add words to wordbank
     w = word_insert(f, "What"); //1
     w = word_insert(f, "is");
@@ -239,19 +278,19 @@ void test_forest(const char *data_directory)
     w = word_insert(f, "going");
     w = word_insert(f, "tonight?");
     // (tree_insert does word find/create internally)
-    t = tree_insert(f, "What", 0, NULL);
-    t = tree_insert(f, "is", 1, t);
-    t = tree_insert(f, "your", 2, t);
-    t = tree_insert(f, "favorite", 3, t);
-    t = tree_insert(f, "food?", 4, t);
+    parent_tree = tree_insert(f, "What", 0, NULL, parent_tree);
+    t = tree_insert(f, "is", 1, parent_tree, parent_tree);
+    t = tree_insert(f, "your", 2, t, parent_tree);
+    t = tree_insert(f, "favorite", 3, t, parent_tree);
+    t = tree_insert(f, "food?", 4, t, parent_tree);
     // example of having tree_insert create non-existent words
-    t = tree_insert(f, "This", 0, NULL);
-    t = tree_insert(f, "has", 1, t);
-    t = tree_insert(f, "new", 2, t);
-    t = tree_insert(f, "words", 3, t);
-    t = tree_insert(f, "created", 4, t);
-    t = tree_insert(f, "from", 5, t);
-    t = tree_insert(f, "tree_insert.", 6, t);
+    parent_tree = tree_insert(f, "This", 0, NULL, parent_tree);
+    t = tree_insert(f, "has", 1, parent_tree, parent_tree);
+    t = tree_insert(f, "new", 2, t, parent_tree);
+    t = tree_insert(f, "words", 3, t, parent_tree);
+    t = tree_insert(f, "created", 4, t, parent_tree);
+    t = tree_insert(f, "from", 5, t, parent_tree);
+    t = tree_insert(f, "tree_insert.", 6, t, parent_tree);
     dump_tree(f);
 }
 
