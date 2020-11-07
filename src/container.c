@@ -20,6 +20,10 @@ struct container *container_init()
 void dump_container(struct container *c, size_t depth, size_t indent)
 {
     size_t i = 0;
+    assert(c);
+    assert(c->tree);
+    assert(c->tree->word);
+    assert(c->tree->word->data);
     printf("depth:%lu| ", depth);
     for(i = 0; i < indent*2; i++) {
         printf(" ");
