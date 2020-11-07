@@ -13,13 +13,13 @@ tests: wordbank.o util.o forest.o container.o
 util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c
 
-container.o: container.c container.h
+container.o: container.c container.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c container.c
 
-forest.o:  forest.c forest.h
+forest.o:  forest.c container.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c forest.c
 
-wordbank.o:  wordbank.c wordbank.h
+wordbank.o:  wordbank.c container.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c wordbank.c
 
 clean:
