@@ -1,11 +1,11 @@
 # WordMesh
 
-WordMesh is a network of data that is related by input order. It creates a
-memory of data chains to create an N-back context (N can be specified while
+WordMesh is a network of data that is related by input order. It builds a
+memory of data sequences to create an N-back context (N can be specified while
 compiling the dataset). The memory works as a way to keep the context of a
 sequence of input or output events. An example of this would be keeping the
 same topic while generating output in response to input while allowing it to
-drift the more it generates.
+drift the more it generates, depending on the N-back setting.
 
 ## Concepts
 * Data is stored in a "wordbank" binary tree for quick lookup.
