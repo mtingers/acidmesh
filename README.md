@@ -64,7 +64,7 @@ int main()
     struct word *w;
     w = word_insert(forest, "Test123", strlen("Test123"));
     // Example of searching for a word in the wordbank
-    w = word_find(f, data, data_len);
+    w = word_find(forest, "Test123", strlen("Test123"));
     if(w) {
         printf("Found word: %s\n", w->data);
     }
