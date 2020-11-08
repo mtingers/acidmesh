@@ -12,9 +12,11 @@ drift the more it generates.
 * A tree is a sequence of inputs that are stored in order of input and
 reference a wordbank item.
 * Each tree holds references to previous and next items.
-* It is stored in "containers", which provide a quick way to determine if a
-word is in a tree at a given depth (another binary tree with referencing the
-tree's wordbank item).
-* Depth refers to the index of the order of the input sequence.
+* A tree is stored in "containers", which provide a quick way to determine if a
+word is in a tree at a given depth.
+* A container is another binary tree referencing the tree's wordbank item.
+* Depth refers to the index of the order of the input sequence. For example, a
+chain of input: "Hello," "World!": "Hello," is at depth 0 while "World!" is at
+depth 1.
 
 ![test](/doc/chart0.png)
