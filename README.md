@@ -12,7 +12,8 @@ drift the more it generates.
 * Each wordbank contains a list of "trees" that reference it.
 * A tree is a sequence of inputs that are stored in order of input and
 reference a wordbank item.
-* Each tree holds references to previous and next items.
+* Each tree holds references to previous and next items, which are items that
+were seen before (previous) or after (next) in an input sequence.
 * A tree is stored in "containers", which provide a quick way to determine if a
 word is in a tree at a given depth.
 * A container is another binary tree referencing the tree's wordbank item.
