@@ -82,10 +82,10 @@ int main()
 * API: Daemonize and provide a basic HTTP access REST API.
 * Clustering: compile dataset over the network distributed to worker nodes.
 * Config file format, options, and parsing. -OR- program arguments may suffice.
-* Serialize and store on-disk to avoid high memory consumption. Requires custom
-internal database engine. Example: convert C datastructures to on-disk format
-(e.g. pointers become encoded integers and reference offsets of a file).
-
-
+* Serialize and store on-disk to avoid high memory consumption and long
+re-compile times. Requires custom internal database engine. Example: convert C
+data structures to on-disk format (e.g. pointers become encoded integers and
+reference offsets of a file). Make this a selectable option (select: memory
+and/or disk).
 
 
