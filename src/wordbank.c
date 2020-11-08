@@ -7,16 +7,17 @@
 #include "wordbank.h"
 #include "forest.h"
 
-struct word *word_init(const char *data)
+struct word *word_init(const char *data, size_t len)
 {
     struct word *w = safe_malloc(sizeof(*w), __LINE__);
     w->left = NULL;
     w->right = NULL;
     w->trees_len = 0;
     w->trees = NULL;
+    w->len = len;
     w->data = safe_malloc(strlen(data)+1, __LINE__);
-    memcpy(w->data, data, strlen(data));
-    w->data[strlen(data)] = '\0';
+    memcpy(w->data, data, len);
+    w->data[len] = '\0';
     return w;
 
 }
@@ -25,7 +26,7 @@ struct wordbank *wordbank_init()
 {
     struct wordbank *wb = safe_malloc(sizeof(*wb), __LINE__);
     wb->count = 1;
-    wb->words = word_init("]");
+    wb->words = word_init("]", 1);
     return wb;
 }
 
@@ -53,28 +54,28 @@ void word_add_tree(struct word *w, struct tree *t)
     }
 }
 
-struct word *word_insert(struct forest *f, const char *data)
+struct word *word_insert(struct forest *f, const char *data, size_t len)
 {
-    return _word_insert(f->wb, data);
+    return _word_insert(f->wb, data, len);
 }
 
-struct word *_word_insert(struct wordbank *wb, const char *data)
+struct word *_word_insert(struct wordbank *wb, const char *data, size_t len)
 {
     int rc;
     struct word *cur = wb->words;
     assert(wb->words != NULL);
     while(cur) {
-        rc = strcmp(data, cur->data);
+        rc = bncmp(data, cur->data, len, cur->len);
         if(rc < 0) {
             if(!cur->left) {
-                cur->left = word_init(data);
+                cur->left = word_init(data, len);
                 wb->count++;
                 return cur->left;
             }
             cur = cur->left;
         } else if(rc > 0) {
             if(!cur->right) {
-                cur->right = word_init(data);
+                cur->right = word_init(data, len);
                 wb->count++;
                 return cur->right;
             }
@@ -88,13 +89,13 @@ struct word *_word_insert(struct wordbank *wb, const char *data)
     exit(1);
 }
 
-struct word *word_find(struct forest *f, const char *data)
+struct word *word_find(struct forest *f, const char *data, size_t len)
 {
     int rc;
     struct word *cur = f->wb->words;
     assert(f->wb->words);
     while(cur) {
-        rc = strcmp(data, cur->data);
+        rc = bncmp(data, cur->data, len, cur->len);
         if(rc < 0) {
             cur = cur->left;
         } else if(rc > 0) {

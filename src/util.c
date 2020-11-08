@@ -82,4 +82,22 @@ struct file *file_open(const char *path, const char *mode, int exit_on_error)
     return f;
 }
 
+int bncmp(const char *s1, const char *s2, size_t s1_n, size_t s2_n)
+{
+    size_t i = 0;
+    size_t min_n = (s1_n > s2_n) ? s2_n : s1_n;
+    for(; i < min_n; i++) {
+        if(s1[i] > s2[i]) {
+            return 1;
+        } else if(s1[i] < s2[i]) {
+            return -1;
+        }
+    }
+    if(s2_n > s1_n) {
+        return 1;
+    } else if(s2_n < s1_n) {
+        return -1;
+    }
+    return 0;
+}
 

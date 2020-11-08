@@ -23,6 +23,6 @@ void *safe_malloc(size_t size, int lineno);
 void *safe_realloc(void *ptr, size_t size, int lineno);
 void safe_free(void *p, int lineno);
 void newline2space(char *s, size_t s_len);
-
+int bncmp(const char *s1, const char *s2, size_t s1_n, size_t s2_n);
 
 #endif

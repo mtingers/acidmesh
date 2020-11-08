@@ -31,7 +31,7 @@ void tree_add_parent(struct tree *t, struct tree *parent)
     }
     cur = t->parents;
     while(cur) {
-        rc = strcmp(cur->tree->word->data, parent->word->data);
+        rc = bncmp(cur->tree->word->data, parent->word->data, cur->tree->word->len, parent->word->len);
         if(rc > 0) {
             if(!cur->right) {
                 cur->right = container_init();
@@ -55,11 +55,11 @@ void tree_add_parent(struct tree *t, struct tree *parent)
     exit(1);
 }
 
-struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struct tree *prev_tree, struct tree *parent_tree)
+struct tree *tree_insert(struct forest *f, const char *data, size_t data_len, size_t depth, struct tree *prev_tree, struct tree *parent_tree)
 {
     int rc;
     size_t i = 0;
-    struct word *w = word_find(f, data);
+    struct word *w = word_find(f, data, data_len);
     struct tree *t = NULL;
     struct tree *return_tree = NULL;
     struct container *cur = NULL;
@@ -71,7 +71,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
     // make sure the word exists in the wordbank
     if(!w) {
         DEBUG_PRINT(("tree_insert(): create word\n"));
-        w = word_insert(f, data);
+        w = word_insert(f, data, data_len);
     }
 
     // When a new depth is reached, expand
@@ -80,6 +80,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         f->container_len++;
         f->containers = safe_realloc(f->containers, sizeof(*f->containers)*f->container_len, __LINE__);
         f->containers[depth] = container_init();
+        f->containers[depth]->count++;
     }
 
     t = tree_init(w, depth);
@@ -90,6 +91,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         // The 1st item in this container, so simply add the tree
         f->containers[depth]->tree = t;
         return_tree = t;
+        f->containers[depth]->count++;
         //return t;
     } else {
         DEBUG_PRINT(("tree_insert(): f->containers[depth]->tree\n"));
@@ -97,13 +99,14 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         // the container tree by word. Traverse the binary tree.
         cur = f->containers[depth];
         while(cur) {
-            rc = strcmp(cur->tree->word->data, data);
+            rc = bncmp(cur->tree->word->data, data, cur->tree->word->len, data_len);
             if(rc < 0) {
                 if(!cur->left) {
                     DEBUG_PRINT(("while(cur): new-left\n"));
                     cur->left = container_init();
                     cur->left->tree = t;
                     return_tree = cur->left->tree;
+                    f->containers[depth]->count++;
                     break;
                 }
                 cur = cur->left;
@@ -113,6 +116,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
                     cur->right = container_init();
                     cur->right->tree = t;
                     return_tree = cur->right->tree;
+                    f->containers[depth]->count++;
                     break;
                 }
                 cur = cur->right;
@@ -129,7 +133,7 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t depth, struc
         DEBUG_PRINT(("tree_insert(): prev_tree\n"));
         // Check if this link already exists in both directions
         for(i = 0; i < prev_tree->next_len; i++) {
-            if(strcmp(prev_tree->nexts[i]->word->data, t->word->data) == 0) {
+            if(bncmp(prev_tree->nexts[i]->word->data, t->word->data, prev_tree->nexts[i]->word->len, t->word->len) == 0) {
                 has_been_linked = 1;
                 break;
             }
@@ -198,6 +202,9 @@ void dump_tree(struct forest *f)
         dump_container(f->containers[i], i, 0);
     }
     dump_words(f->wb->words, 0);
+    for(i = 0; i < f->container_len; i++) {
+        printf("depth-word-count:%lu|%lu\n", i, f->containers[i]->count);
+    }
     printf("Total words: %lu\n", f->wb->count);
 }
 
@@ -207,7 +214,7 @@ void dump_tree(struct forest *f)
 void test_forest(const char *data_directory)
 {
     struct forest *f = forest_init();
-    struct word *w;
+    //struct word *w;
     struct tree *t, *parent_tree = NULL;
     char *token = NULL;
     char *rest = NULL;
@@ -269,12 +276,18 @@ void test_forest(const char *data_directory)
                 t = NULL;
                 parent_tree = NULL;
                 for(token = strtok_r(str, " ", &rest); token != NULL; token = strtok_r(NULL, " ", &rest)) {
-                    t = tree_insert(f, token, i, t, parent_tree);
+                    t = tree_insert(f, token, strlen(token), i, t, parent_tree);
                     i++;
                     if(!parent_tree) {
                         parent_tree = t;
                     }
                 }
+                // TODO: Some of these are List_of_ or Index_of_ with no \0
+                // delimiter for sentences (only newline).
+                // Maybe check name of file and filter out?
+                //if(i > 500) {
+                //    printf("i:%lu, %s\n", i, namelist[n]->d_name);
+                //}
                 free(str);
                 str = NULL;
                 memset(buf, '\0', sizeof(*buf)*BUF_SIZE);
@@ -295,32 +308,6 @@ void test_forest(const char *data_directory)
     }
     cpu_time_avg = cpu_time_total/(double)nn;
     free(namelist);
-    parent_tree = NULL;
-    // add words to wordbank
-    w = word_insert(f, "What"); //1
-    w = word_insert(f, "is");
-    w = word_insert(f, "your");
-    w = word_insert(f, "favorite");
-    w = word_insert(f, "food?");
-    w = word_insert(f, "Where"); //2
-    w = word_insert(f, "are");
-    w = word_insert(f, "we");
-    w = word_insert(f, "going");
-    w = word_insert(f, "tonight?");
-    // (tree_insert does word find/create internally)
-    parent_tree = tree_insert(f, "What", 0, NULL, parent_tree);
-    t = tree_insert(f, "is", 1, parent_tree, parent_tree);
-    t = tree_insert(f, "your", 2, t, parent_tree);
-    t = tree_insert(f, "favorite", 3, t, parent_tree);
-    t = tree_insert(f, "food?", 4, t, parent_tree);
-    // example of having tree_insert create non-existent words
-    parent_tree = tree_insert(f, "This", 0, NULL, parent_tree);
-    t = tree_insert(f, "has", 1, parent_tree, parent_tree);
-    t = tree_insert(f, "new", 2, t, parent_tree);
-    t = tree_insert(f, "words", 3, t, parent_tree);
-    t = tree_insert(f, "created", 4, t, parent_tree);
-    t = tree_insert(f, "from", 5, t, parent_tree);
-    t = tree_insert(f, "tree_insert.", 6, t, parent_tree);
     dump_tree(f);
     printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n", cpu_time_total, cpu_time_avg, cpu_time_min, cpu_time_max);
 }

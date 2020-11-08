@@ -11,6 +11,7 @@
 struct container *container_init()
 {
     struct container *c = safe_malloc(sizeof(*c), __LINE__);
+    c->count = 0;
     c->tree = NULL;
     c->left = NULL;
     c->right = NULL;

@@ -2,6 +2,7 @@
 #define CONTAINER_H 1
 
 struct container {
+    size_t count;
     struct tree *tree;
     struct container *left;
     struct container *right;
