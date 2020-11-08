@@ -30,7 +30,7 @@ within it's structure.
 
 ## Example Usage
 
-See [src/forest.c](/src/forest.c) `test_forest()` function for a full example of compiling
+See [src/forest.c](/src/forest.c#L220) `test_forest()` function for a full example of compiling
 a dataset.
 
 ```C
