@@ -7,6 +7,7 @@ sequence of input or output events. An example of this would be keeping the
 same topic while generating output in response to input while allowing it to
 drift the more it generates.
 
+## Concepts
 * Data is stored in a "wordbank" binary tree for quick lookup.
 * Each wordbank contains a list of "trees" that reference it.
 * A tree is a sequence of inputs that are stored in order of input and
