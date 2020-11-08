@@ -1,2 +1,3 @@
 # wordmesh
-A Generative Pre-trained Transformer
+
+![test](/doc/chart0.png)
