@@ -57,7 +57,7 @@ int main()
         strlen("Have"), // <- length of input
         0               // <- depth (item 0)
     );
-    tree_insert(forest, "a", strlen("a"), 1);;
+    tree_insert(forest, "a", strlen("a"), 1);
     tree_insert(forest, "good", strlen("good"), 2);
     tree_insert(forest, "day!", strlen("day!"), 3);
 
