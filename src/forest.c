@@ -65,13 +65,22 @@ void tree_insert(struct forest *f, const char *data, size_t data_len, size_t dep
     struct word *w = word_find(f, data, data_len);
     struct tree *t = NULL;
     struct tree *return_tree = NULL;
-    struct tree *prev_tree = f->last_item;
-    struct tree *parent_tree = f->first_item;
+    struct tree *prev_tree = NULL;
+    struct tree *parent_tree = NULL;
     struct container *cur = NULL;
     int has_been_linked = 0;
 
     DEBUG_PRINT(("tree_insert(): data=%s depth=%lu prev_tree:%s\n",
         data, depth, (prev_tree) ? "yes" : "no"));
+
+    // reset the forest item pointers on first item in sequence
+    if(depth < 1) {
+        f->last_item = NULL;
+        f->first_item = NULL;
+    } else {
+        parent_tree = f->first_item;
+        prev_tree = f->last_item;
+    }
 
     // make sure the word exists in the wordbank
     if(!w) {
@@ -166,35 +175,26 @@ void tree_insert(struct forest *f, const char *data, size_t data_len, size_t dep
     }
     if(parent_tree) {
         tree_add_parent(return_tree, parent_tree);
-        f->last_item = return_tree;
     } else {
         tree_add_parent(return_tree, return_tree);
-        f->first_item = return_tree;
     }
     // Add this tree reference (word at this depth) to the word itself for
     // reverse lookups from a word.
     word_add_tree(w, return_tree);
 
-    /*
-    // Set the last item inserted in this sequence
-    if(f->first_item) {
-        f->last_item = return_tree;
-    }
     // Set the first tree in the sequence if depth == 0
     if(depth < 1) {
         f->first_item = return_tree;
-    }*/
+    }
+    // Set the last item inserted in this sequence
+    f->last_item = return_tree;
 }
 
 struct tree *tree_init(struct word *w, size_t depth)
 {
     struct tree *t = safe_malloc(sizeof(*t), __LINE__);
     t->depth = depth;
-    //t->parents_len = 0;
-    //t->parents_depth_len = NULL;
     t->parents = NULL;
-    //t->parents = safe_malloc(sizeof(*t->parents), __LINE__);
-    //t->parents[0] = parent;
     t->word = w;
     t->prev_len = 0;
     t->next_len = 0;
@@ -242,8 +242,6 @@ void test_forest(const char *data_directory)
     }
     // use partial: n = (int)(n/4);
     while(n--) {
-        if(nn-n > 5000)
-            break;
         find = strstr(namelist[n]->d_name, ".dl");
         if(!find) continue;
         if(n % 1000 == 0) {
@@ -265,20 +263,17 @@ void test_forest(const char *data_directory)
             buf_i++;
             if(txt[x] == '\0') {
                 newline2space(buf, buf_i);
+                str = strdup(buf);
                 token = NULL;
-                buf_i = 0;
                 token = NULL;
                 rest = NULL;
-                str = strdup(buf);
+                buf_i = 0;
                 i = 0;
-                //for(token = strtok_r(str, " ", &rest);
-                //    token != NULL;
-                //    token = strtok_r(NULL, " ", &rest)
-                //) {
                 token = strtok_r(str, " ", &rest);
                 while(token != NULL) {
                     tree_insert(f, token, strlen(token), i);
                     token = strtok_r(NULL, " ", &rest);
+                    i++;
                 }
                 // TODO: Some of these are List_of_ or Index_of_ with no \0
                 // delimiter for sentences (only newline).

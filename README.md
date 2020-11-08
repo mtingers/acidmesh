@@ -51,17 +51,17 @@ int main()
 
     // Example of creating a tree from sentence: "Have a good day!"
     // Internally this adds new words to the wordbank
-    start_tree = tree_insert(
+    tree_insert(
         forest,         // <- forest
         "Have",         // <- input sequence item 0
         strlen("Have"), // <- length of input
-        0,              // <- depth (item 0)
-        NULL,           // <- previous tree (none since depth is 0)
-        NULL            // <- first tree in sequence (none since depth is 0)
+        0               // <- depth (item 0)
     );
-    tree = tree_insert(forest, "a", strlen("a"), 1, start_tree, start_tree);
-    tree = tree_insert(forest, "good", strlen("good"), 2, tree, start_tree);
-    tree = tree_insert(forest, "day!", strlen("day!"), 3, tree, start_tree);
+    tree_insert(forest, "a", strlen("a"), 1);;
+    tree_insert(forest, "good", strlen("good"), 2);
+    tree_insert(forest, "day!", strlen("day!"), 3);
+
+    printf("last_item: %s\n", f->last_item->word->data);
 
     // Example of inserting a word into the wordbank, detached from any tree
     struct word *w;
