@@ -9,8 +9,8 @@ drift the more it generates, depending on the N-back setting.
 
 ## Concepts
 * Data is stored in a `wordbank` binary tree for quick lookup.
-* Each `wordbank` contains a list of `tree` that reference back to it
-(tree references are internally stored as a binary tree for quick access).
+* Each `wordbank` contains a list of `trees` that reference back to it
+(`tree` references are internally stored as a binary tree for quick access).
 * A `tree` is a sequence of inputs that are stored in order of input and
 reference a `wordbank` item.
 * Each `tree` holds references to previous and next items, which are items that
