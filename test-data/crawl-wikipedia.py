@@ -31,14 +31,10 @@ def build_search_list(limit=200):
     return searches
 
 def create_wiki_dirs():
-    try:
+    if not os.path.exists(OUT):
         os.mkdir(OUT)
-    except:
-        pass
-    try:
+    if not os.path.exists(OUT_RAW):
         os.mkdir(OUT_RAW)
-    except:
-        pass
 
 def gather_titles(searches, sroffset_start=0, sroffset_max=400):
     titles = []
@@ -50,10 +46,8 @@ def gather_titles(searches, sroffset_start=0, sroffset_max=400):
             print('GET_TITLES:', query)
             try:
                 rc = requests.get(query, timeout=15)
-            except requests.exceptions.ReadTimeout:
-                time.sleep(1)
-                continue
-            except requests.exceptions.ConnectionError:
+            except Exception as err:
+                print(err)
                 time.sleep(1)
                 continue
             try:
@@ -86,15 +80,12 @@ def download_and_transform_wikipage(titles):
             outname = '{}/{}.dl'.format(OUT, title)
         except Exception as err:
             print(err)
-            continue
-        except requests.exceptions.ConnectionError:
             time.sleep(1)
             continue
         if os.path.exists(outname):
             print("SKIP:", title)
             continue
         query = '{}?action=query&prop=extracts&exintro&explaintext&format=json&titles={}'.format(API_URL, title)
-        print('---- {} ----'.format(title))
         print('DOWNLOAD:', query)
         try:
             rc = requests.get(query, timeout=15)
