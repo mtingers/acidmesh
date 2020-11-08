@@ -9,14 +9,14 @@ drift the more it generates, depending on the N-back setting.
 
 ## Concepts
 * Data is stored in a `wordbank` binary tree for quick lookup.
-* Each `wordbank` contains a list of `trees` that reference back to it
+* Each `wordbank` contains a list of `tree` references back to it
 (`tree` references are internally stored as a binary tree for quick access).
 * A `tree` is a sequence of inputs that are stored in order of input and
 reference a `wordbank` item.
 * Each `tree` holds references to previous and next items, which are items that
 were seen before (previous) or after (next) in an input sequence.
-* A `tree` is stored in `containers`, which provide a quick way to determine if a
-word is in a `tree` at a given depth.
+* A `tree` is held within a `container` binary tree, which provide a quick way
+to determine if a word is in a `tree` at a given depth.
 * A `container` is sorted by the `tree`'s `wordbank` data reference.
 * Depth refers to the index of the order of the input sequence. For example, a
 sequence of input: `Hello,` `World!`: `Hello,` is at depth 0 while `World!` is
