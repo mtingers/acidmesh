@@ -17,6 +17,8 @@ struct forest *forest_init()
     f->containers[0] = container_init();
     f->container_len = 1;
     f->wb = wordbank_init();
+    f->first_item = NULL;
+    f->last_item = NULL;
     return f;
 }
 
@@ -56,14 +58,15 @@ void tree_add_parent(struct tree *t, struct tree *parent)
     exit(1);
 }
 
-struct tree *tree_insert(struct forest *f, const char *data, size_t data_len,
-        size_t depth, struct tree *prev_tree, struct tree *parent_tree)
+void tree_insert(struct forest *f, const char *data, size_t data_len, size_t depth)
 {
     int rc;
     size_t i = 0;
     struct word *w = word_find(f, data, data_len);
     struct tree *t = NULL;
     struct tree *return_tree = NULL;
+    struct tree *prev_tree = f->last_item;
+    struct tree *parent_tree = f->first_item;
     struct container *cur = NULL;
     int has_been_linked = 0;
 
@@ -96,7 +99,6 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t data_len,
         f->containers[depth]->tree = t;
         return_tree = t;
         f->containers[depth]->count++;
-        //return t;
     } else {
         DEBUG_PRINT(("tree_insert(): f->containers[depth]->tree\n"));
         // Not the first tree in this container at this depth, so insert into
@@ -160,28 +162,28 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t data_len,
             );
             t->prevs[t->prev_len] = t;
             t->prev_len++;
-            // copy prev parent, this inherets down the tree for quick lookup
-            // note that this tree can have multiple parents on how it got to
-            // this depth
-            // (see below: tree_add_parent)
-            //t->parent = prev_tree->parent;
-        } else {
-            DEBUG_PRINT(("tree_insert(): found-link\n"));
         }
-    } else {
-        DEBUG_PRINT(("tree_insert(): !!prev_tree\n"));
-        // this inherets down the tree for quick lookup
-        //t->parent = t; // point to self
     }
     if(parent_tree) {
         tree_add_parent(return_tree, parent_tree);
+        f->last_item = return_tree;
     } else {
         tree_add_parent(return_tree, return_tree);
+        f->first_item = return_tree;
     }
     // Add this tree reference (word at this depth) to the word itself for
     // reverse lookups from a word.
     word_add_tree(w, return_tree);
-    return return_tree;
+
+    /*
+    // Set the last item inserted in this sequence
+    if(f->first_item) {
+        f->last_item = return_tree;
+    }
+    // Set the first tree in the sequence if depth == 0
+    if(depth < 1) {
+        f->first_item = return_tree;
+    }*/
 }
 
 struct tree *tree_init(struct word *w, size_t depth)
@@ -220,26 +222,16 @@ void dump_tree(struct forest *f)
 void test_forest(const char *data_directory)
 {
     struct forest *f = forest_init();
-    //struct word *w;
-    struct tree *t, *parent_tree = NULL;
-    char *token = NULL;
-    char *rest = NULL;
-    char *str = NULL;
+    char *token = NULL, *rest = NULL, *str = NULL;
     struct dirent **namelist;
-    int n;
-    char *find = NULL;
-    char *txt = NULL;
-    struct file *fd;
+    int n = 0, nn = 0;
+    size_t buf_i = 0, x = 0, i = 0;
+    char *find = NULL, *txt = NULL;
     char *buf = safe_malloc(sizeof(*buf)*BUF_SIZE, __LINE__);
-    size_t buf_i = 0, x = 0;
-    size_t i = 0;
-    int nn = 0;
     clock_t start, end;
-    double cpu_time_used;
-    double cpu_time_avg = 0.0;
-    double cpu_time_total = 0.0;
-    double cpu_time_max = 0.0;
-    double cpu_time_min = 9999999999999999.9;
+    double time_used;
+    double time_avg = 0.0, time_total = 0.0, time_max = 0.0, time_min = 99999.9;
+    struct file *fd;
 
     n = scandir(data_directory, &namelist, NULL, alphasort);
     nn = n;
@@ -248,12 +240,12 @@ void test_forest(const char *data_directory)
         perror("scandir");
         exit(1);
     }
-    DEBUG_PRINT(("Start file read loop...\n"));
     // use partial: n = (int)(n/4);
-    while (n--) {
+    while(n--) {
+        if(nn-n > 5000)
+            break;
         find = strstr(namelist[n]->d_name, ".dl");
-        if(!find)
-            continue;
+        if(!find) continue;
         if(n % 1000 == 0) {
             printf("%d/%d: word-count:%lu\n", nn-n, nn, f->wb->count);
         }
@@ -279,27 +271,19 @@ void test_forest(const char *data_directory)
                 rest = NULL;
                 str = strdup(buf);
                 i = 0;
-                t = NULL;
-                parent_tree = NULL;
-                for(token = strtok_r(str, " ", &rest);
-                    token != NULL;
-                    token = strtok_r(NULL, " ", &rest)
-                ) {
-                    t = tree_insert(f, token, strlen(token), i, t, parent_tree);
-                    i++;
-                    if(!parent_tree) {
-                        parent_tree = t;
-                    }
+                //for(token = strtok_r(str, " ", &rest);
+                //    token != NULL;
+                //    token = strtok_r(NULL, " ", &rest)
+                //) {
+                token = strtok_r(str, " ", &rest);
+                while(token != NULL) {
+                    tree_insert(f, token, strlen(token), i);
+                    token = strtok_r(NULL, " ", &rest);
                 }
                 // TODO: Some of these are List_of_ or Index_of_ with no \0
                 // delimiter for sentences (only newline).
-                // Maybe check name of file and filter out?
-                //if(i > 500) {
-                //    printf("i:%lu, %s\n", i, namelist[n]->d_name);
-                //}
                 free(str);
                 str = NULL;
-                memset(buf, '\0', sizeof(*buf)*BUF_SIZE);
             } else if(buf_i >= BUF_SIZE) {
                 fprintf(stderr, "WARNING: Buffer overflow, skipping some data.\n");
                 break;
@@ -308,18 +292,18 @@ void test_forest(const char *data_directory)
         free(fd);
         free(txt);
         end = clock();
-        cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-        cpu_time_total += cpu_time_used;
-        if(cpu_time_used > cpu_time_max)
-            cpu_time_max = cpu_time_used;
-        if(cpu_time_used < cpu_time_min)
-            cpu_time_min = cpu_time_used;
+        time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        time_total += time_used;
+        if(time_used > time_max)
+            time_max = time_used;
+        if(time_used < time_min)
+            time_min = time_used;
     }
-    cpu_time_avg = cpu_time_total/(double)nn;
+    time_avg = time_total/(double)nn;
     free(namelist);
     dump_tree(f);
     printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n",
-        cpu_time_total, cpu_time_avg, cpu_time_min, cpu_time_max);
+        time_total, time_avg, time_min, time_max);
 }
 
 int main(int argc, char **argv)
