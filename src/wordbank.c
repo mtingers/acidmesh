@@ -42,7 +42,8 @@ void word_add_tree(struct word *w, struct tree *t)
                 w->trees[i] = NULL;
             }
         } else {
-            w->trees = safe_realloc(w->trees, sizeof(*w->trees)*(t->depth+1), __LINE__);
+            w->trees = safe_realloc(w->trees,
+                sizeof(*w->trees)*(t->depth+1), __LINE__);
         }
         w->trees[t->depth] = t;
         w->trees_len = t->depth+1;

@@ -31,7 +31,8 @@ void tree_add_parent(struct tree *t, struct tree *parent)
     }
     cur = t->parents;
     while(cur) {
-        rc = bncmp(cur->tree->word->data, parent->word->data, cur->tree->word->len, parent->word->len);
+        rc = bncmp(cur->tree->word->data, parent->word->data,
+            cur->tree->word->len, parent->word->len);
         if(rc > 0) {
             if(!cur->right) {
                 cur->right = container_init();
@@ -55,7 +56,8 @@ void tree_add_parent(struct tree *t, struct tree *parent)
     exit(1);
 }
 
-struct tree *tree_insert(struct forest *f, const char *data, size_t data_len, size_t depth, struct tree *prev_tree, struct tree *parent_tree)
+struct tree *tree_insert(struct forest *f, const char *data, size_t data_len,
+        size_t depth, struct tree *prev_tree, struct tree *parent_tree)
 {
     int rc;
     size_t i = 0;
@@ -76,9 +78,11 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t data_len, si
 
     // When a new depth is reached, expand
     if(f->container_len < depth+1) {
-        DEBUG_PRINT(("tree_insert(): expand containers: %lu -> %lu\n", f->container_len, depth));
+        DEBUG_PRINT(("tree_insert(): expand containers: %lu -> %lu\n",
+            f->container_len, depth));
         f->container_len++;
-        f->containers = safe_realloc(f->containers, sizeof(*f->containers)*f->container_len, __LINE__);
+        f->containers = safe_realloc(f->containers,
+            sizeof(*f->containers)*f->container_len, __LINE__);
         f->containers[depth] = container_init();
         f->containers[depth]->count++;
     }
@@ -99,7 +103,8 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t data_len, si
         // the container tree by word. Traverse the binary tree.
         cur = f->containers[depth];
         while(cur) {
-            rc = bncmp(cur->tree->word->data, data, cur->tree->word->len, data_len);
+            rc = bncmp(cur->tree->word->data, data,
+                cur->tree->word->len, data_len);
             if(rc < 0) {
                 if(!cur->left) {
                     DEBUG_PRINT(("while(cur): new-left\n"));
@@ -133,7 +138,8 @@ struct tree *tree_insert(struct forest *f, const char *data, size_t data_len, si
         DEBUG_PRINT(("tree_insert(): prev_tree\n"));
         // Check if this link already exists in both directions
         for(i = 0; i < prev_tree->next_len; i++) {
-            if(bncmp(prev_tree->nexts[i]->word->data, t->word->data, prev_tree->nexts[i]->word->len, t->word->len) == 0) {
+            if(bncmp(prev_tree->nexts[i]->word->data, t->word->data,
+                    prev_tree->nexts[i]->word->len, t->word->len) == 0) {
                 has_been_linked = 1;
                 break;
             }
@@ -275,7 +281,10 @@ void test_forest(const char *data_directory)
                 i = 0;
                 t = NULL;
                 parent_tree = NULL;
-                for(token = strtok_r(str, " ", &rest); token != NULL; token = strtok_r(NULL, " ", &rest)) {
+                for(token = strtok_r(str, " ", &rest);
+                    token != NULL;
+                    token = strtok_r(NULL, " ", &rest)
+                ) {
                     t = tree_insert(f, token, strlen(token), i, t, parent_tree);
                     i++;
                     if(!parent_tree) {
@@ -309,7 +318,8 @@ void test_forest(const char *data_directory)
     cpu_time_avg = cpu_time_total/(double)nn;
     free(namelist);
     dump_tree(f);
-    printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n", cpu_time_total, cpu_time_avg, cpu_time_min, cpu_time_max);
+    printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n",
+        cpu_time_total, cpu_time_avg, cpu_time_min, cpu_time_max);
 }
 
 int main(int argc, char **argv)
