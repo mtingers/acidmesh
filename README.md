@@ -18,7 +18,7 @@ were seen before (previous) or after (next) in an input sequence.
 word is in a tree at a given depth.
 * A container is another binary tree referencing the tree's wordbank item.
 * Depth refers to the index of the order of the input sequence. For example, a
-chain of input: "Hello," "World!": "Hello," is at depth 0 while "World!" is at
-depth 1.
+sequence of input: "Hello," "World!": "Hello," is at depth 0 while "World!" is
+at depth 1.
 
 ![test](/doc/chart0.png)
