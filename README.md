@@ -23,7 +23,7 @@ sequence of input: `Hello,` `World!`: `Hello,` is at depth 0 while `World!` is
 at depth 1.
 * A `forest` acts as a wrapper containing `wordbank`, `tree`, and `container`.
 It simplifies the number of function arguments needed since they are contained
-within it's structure.
+within it's structure. Works similar to a class with local public variables.
 
 
 ![test](/doc/chart0.png)
@@ -52,7 +52,7 @@ int main()
     // Example of creating a tree from sentence: "Have a good day!"
     // Internally this adds new words to the wordbank
     tree_insert(
-        forest,         // <- forest
+        forest,         // <- forest wrapper with internal tracking
         "Have",         // <- input sequence item 0
         strlen("Have"), // <- length of input
         0               // <- depth (item 0)
