@@ -87,6 +87,6 @@ re-compile times. Requires custom internal database engine. Example: convert C
 data structures to on-disk format (e.g. pointers become encoded integers and
 reference offsets of a file). Make this a selectable option (select: memory
 and/or disk).
-* Swap out basic binary tree for self-balancing or something more efficent.
+* Swap out basic binary tree for self-balancing or something more performant.
 * Direct Python module integration.
 

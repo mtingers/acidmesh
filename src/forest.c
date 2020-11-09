@@ -9,6 +9,7 @@
 #include "forest.h"
 #include "wordbank.h"
 #include "container.h"
+#include "context.h"
 
 struct forest *forest_init()
 {
@@ -19,6 +20,9 @@ struct forest *forest_init()
     f->wb = wordbank_init();
     f->first_item = NULL;
     f->last_item = NULL;
+    f->ctxs_len = 0;
+    f->ctxs = NULL;
+    //f->ctx_use_prev = 0;
     return f;
 }
 
@@ -69,6 +73,7 @@ void tree_insert(struct forest *f, const char *data, size_t data_len, size_t dep
     struct tree *parent_tree = NULL;
     struct container *cur = NULL;
     int has_been_linked = 0;
+    struct context *ctx = NULL;
 
     DEBUG_PRINT(("tree_insert(): data=%s depth=%lu prev_tree:%s\n",
         data, depth, (prev_tree) ? "yes" : "no"));
@@ -188,6 +193,34 @@ void tree_insert(struct forest *f, const char *data, size_t data_len, size_t dep
     }
     // Set the last item inserted in this sequence
     f->last_item = return_tree;
+
+    // start of a new context that can be linked (new file being read and tokenized)
+    if(!f->ctxs || depth < 1) {
+        ctx = ctx_init();
+        if(!f->ctxs) {
+            f->ctxs = safe_malloc(sizeof(*f->ctxs), __LINE__);
+        } else {
+            f->ctxs = safe_realloc(f->ctxs, sizeof(*f->ctxs)*(f->ctxs_len+1), __LINE__);
+        }
+        f->ctxs[f->ctxs_len] = ctx;
+        ctx->trees = safe_malloc(sizeof(*ctx->trees), __LINE__);
+        ctx->trees[ctx->trees_len] = return_tree;
+        f->ctxs_len++;
+        ctx->trees_len++;
+    } else {
+        ctx = f->ctxs[f->ctxs_len-1];
+        ctx->trees = safe_realloc(ctx->trees, sizeof(*ctx->trees)*(ctx->trees_len+1), __LINE__);
+        ctx->trees[ctx->trees_len] = return_tree;
+        ctx->trees_len++;
+    }
+}
+
+void link_last_contexts(struct forest *f)
+{
+    if(f->ctxs_len > 1) {
+        f->ctxs[f->ctxs_len-2]->next_ctx = f->ctxs[f->ctxs_len-1]; 
+        f->ctxs[f->ctxs_len-1]->prev_ctx = f->ctxs[f->ctxs_len-2]; 
+    }
 }
 
 struct tree *tree_init(struct word *w, size_t depth)
@@ -216,6 +249,10 @@ void dump_tree(struct forest *f)
     printf("Total words: %lu\n", f->wb->count);
 }
 
+int test_forest_py()
+{
+    return 0;
+}
 
 #ifdef TEST_FOREST
 #define BUF_SIZE 1024*1024*4
@@ -258,6 +295,7 @@ void test_forest(const char *data_directory)
         fd->read(fd, fd->size, txt);
         fd->close(fd);
         memset(buf, '\0', sizeof(*buf)*BUF_SIZE);
+        //f->ctx_use_prev = 0;
         for(x = 0; x < fd->size; x++) {
             buf[buf_i] = txt[x];
             buf_i++;
@@ -274,11 +312,13 @@ void test_forest(const char *data_directory)
                     tree_insert(f, token, strlen(token), i);
                     token = strtok_r(NULL, " ", &rest);
                     i++;
+                    //f->ctx_use_prev = 1;
                 }
                 // TODO: Some of these are List_of_ or Index_of_ with no \0
                 // delimiter for sentences (only newline).
                 free(str);
                 str = NULL;
+                link_last_contexts(f);
             } else if(buf_i >= BUF_SIZE) {
                 fprintf(stderr, "WARNING: Buffer overflow, skipping some data.\n");
                 break;
@@ -299,6 +339,15 @@ void test_forest(const char *data_directory)
     dump_tree(f);
     printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n",
         time_total, time_avg, time_min, time_max);
+    printf("total_contexts:%lu\n", f->ctxs_len);
+    printf("context sample:\n");
+    size_t j = 0;
+    for(i = 2; i < 5; i++) {
+        for(j = 0; j < f->ctxs[i]->trees_len; j++) {
+            printf("%s ", f->ctxs[i]->trees[j]->word->data);
+        }
+        printf("\n");
+    }
 }
 
 int main(int argc, char **argv)

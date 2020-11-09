@@ -5,21 +5,24 @@ CC=cc
 default: tests
 
 debug: wordbank.o util.o forest.o container.o
-	$(CC) $(CFLAGS) util.o wordbank.o container.o forest.c -DTEST_FOREST -D DEBUG -o ../bin/test_forest
+	$(CC) $(CFLAGS) util.o context.o wordbank.o container.o forest.c -DTEST_FOREST -D DEBUG -o ../bin/test_forest
 
-tests: wordbank.o util.o forest.o container.o
-	$(CC) $(CFLAGS) util.o wordbank.o container.o forest.c -DTEST_FOREST  -o ../bin/test_forest
+tests: wordbank.o util.o context.o forest.o container.o
+	$(CC) $(CFLAGS) util.o context.o wordbank.o container.o forest.c -DTEST_FOREST  -o ../bin/test_forest
 
 util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c
 
-container.o: container.c container.h util.h forest.h wordbank.h
+context.o: context.c container.h context.h util.h forest.h wordbank.h
+	$(CC) $(CFLAGS) -c context.c
+
+container.o: container.c container.h context.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c container.c
 
-forest.o:  forest.c container.h util.h forest.h wordbank.h
+forest.o:  forest.c container.h context.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c forest.c
 
-wordbank.o:  wordbank.c container.h util.h forest.h wordbank.h
+wordbank.o:  wordbank.c container.h context.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c wordbank.c
 
 clean:

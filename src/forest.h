@@ -17,6 +17,9 @@ struct forest {
     struct wordbank *wb;
     struct tree *first_item;
     struct tree *last_item;
+    size_t ctxs_len;
+    struct context **ctxs;
+    int ctx_use_prev;
 };
 
 struct forest *forest_init();
