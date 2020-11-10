@@ -8,8 +8,6 @@ same topic while generating output in response to input while allowing it to
 drift the more it generates, depending on the N-back setting.
 
 
-![test](/doc/chart0.png)
-
 # Example Usage
 
 ## Python
