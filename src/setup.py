@@ -2,14 +2,14 @@ from distutils.core import setup, Extension
 
 def main():
     setup(
-        name='wordmesh',
+        name='acidmesh',
         version='1.0.1',
-        description='WordMesh',
+        description='AcidMesh',
         author='Matth Ingersoll',
         author_email='matth@mtingers.com',
-        packages=['wordmesh',],
+        packages=['acidmesh',],
         license='GPLv3',
-        url='https://github.com/mtingers/wordmesh',
+        url='https://github.com/mtingers/acidmesh',
         keywords=['GPT',],
         classifiers=[
             'Intended Audience :: Developers',
@@ -22,8 +22,8 @@ def main():
             'Programming Language :: Python :: 3.9',
         ],
         ext_modules=[
-            Extension('cwordmesh',
-                sources=['pywordmesh.c', 'container.c', 'context.c', 'forest.c', 'util.c', 'wordbank.c'],
+            Extension('cacidmesh',
+                sources=['pyacidmesh.c', 'container.c', 'context.c', 'mesh.c', 'util.c', 'datatree.c'],
             )
         ]
     )

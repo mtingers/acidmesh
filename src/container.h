@@ -3,12 +3,12 @@
 
 struct container {
     size_t count;
-    struct tree *tree;
+    struct sequence *seq;
     struct container *left;
     struct container *right;
 };
 
-struct container *container_init();
+struct container *container_init(void);
 void dump_container(struct container *c, size_t depth, size_t indent);
 
 #endif

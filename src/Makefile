@@ -4,26 +4,26 @@ CC=cc
 
 default: tests
 
-debug: wordbank.o util.o forest.o container.o
-	$(CC) $(CFLAGS) util.o context.o wordbank.o container.o forest.c -DTEST_FOREST -D DEBUG -o ../bin/test_forest
+debug: datatree.o util.o mesh.o container.o
+	$(CC) $(CFLAGS) util.o context.o datatree.o container.o mesh.c -DTEST_FOREST -D DEBUG -o ../bin/test_mesh
 
-tests: wordbank.o util.o context.o forest.o container.o
-	$(CC) $(CFLAGS) util.o context.o wordbank.o container.o forest.c -DTEST_FOREST  -o ../bin/test_forest
+tests: datatree.o util.o context.o mesh.o container.o
+	$(CC) $(CFLAGS) util.o context.o datatree.o container.o mesh.c -DTEST_FOREST  -o ../bin/test_mesh
 
 util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c
 
-context.o: context.c container.h context.h util.h forest.h wordbank.h
+context.o: context.c container.h context.h util.h mesh.h datatree.h
 	$(CC) $(CFLAGS) -c context.c
 
-container.o: container.c container.h context.h util.h forest.h wordbank.h
+container.o: container.c container.h context.h util.h mesh.h datatree.h
 	$(CC) $(CFLAGS) -c container.c
 
-forest.o:  forest.c container.h context.h util.h forest.h wordbank.h
-	$(CC) $(CFLAGS) -c forest.c
+mesh.o:  mesh.c container.h context.h util.h mesh.h datatree.h
+	$(CC) $(CFLAGS) -c mesh.c
 
-wordbank.o:  wordbank.c container.h context.h util.h forest.h wordbank.h
-	$(CC) $(CFLAGS) -c wordbank.c
+datatree.o:  datatree.c container.h context.h util.h mesh.h datatree.h
+	$(CC) $(CFLAGS) -c datatree.c
 
 py:
 	rm -r build || echo

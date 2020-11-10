@@ -1,36 +1,18 @@
-# WordMesh
+# AcidMesh
 
-WordMesh is a network of data that is related by input order. It builds a
-memory of data sequences to create an N-back context (N can be specified while
-compiling the dataset). The memory works as a way to keep the context of a
+AcidMesh is a network of data that is related by input order. It builds a
+memory of data sequences to create an N-back context. The memory works as a way
+to hold the context of a
 sequence of input or output events. An example of this would be keeping the
 same topic while generating output in response to input while allowing it to
 drift the more it generates, depending on the N-back setting.
 
-## Concepts
-* Data is stored in a `wordbank` binary tree for quick lookup.
-* Each `wordbank` contains a list of `tree` references back to it
-(`tree` references are internally stored as a binary tree for quick access).
-* A `tree` is a sequence of inputs that are stored in order of input and
-reference a `wordbank` item.
-* Each `tree` holds references to previous and next items, which are items that
-were seen before (previous) or after (next) in an input sequence.
-* A `tree` is held within a `container` binary tree, which provide a quick way
-to determine if a word is in a `tree` at a given depth.
-* A `container` is sorted by the `tree`'s `wordbank` data reference.
-* Depth refers to the index of the order of the input sequence. For example, a
-sequence of input: `Hello,` `World!`: `Hello,` is at depth 0 while `World!` is
-at depth 1.
-* A `forest` acts as a wrapper containing `wordbank`, `tree`, and `container`.
-It simplifies the number of function arguments needed since they are contained
-within it's structure. Works similar to a class with local public variables.
-
 
 ![test](/doc/chart0.png)
 
-## Example Usage
+# Example Usage
 
-### Python
+## Python
 
 Setup and install from source:
 ```bash
@@ -42,9 +24,9 @@ make py
 
 Example script:
 ```python
-from wordmesh import Forest
+from acidmesh import Mesh
 
-f = Forest()
+f = Mesh()
 
 words = [
     ("Hello,", "world!"),
@@ -55,7 +37,7 @@ words = [
 for w in words:
     depth = 0
     for x in w:
-        f.tree_insert(x, len(x), depth)
+        f.sequence_insert(x, len(x), depth)
         depth += 1
     f.link_last_contexts()
 
@@ -63,53 +45,29 @@ f.dump()
 ```
 
 
-### Direct C
+## Example C
 
-See [src/forest.c](/src/forest.c#L220) `test_forest()` function for a full example of compiling
-a dataset.
+See [src/mesh.c](/src/mesh.c#L220) `test_mesh()` function for a full example of
+compiling a dataset. Or see [tests/test1.c](/tests/test1.c) for a basic
+example.
 
-```C
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include "util.h"
-#include "forest.h"
-#include "wordbank.h"
-#include "container.h"
-
-int main()
-{
-    struct forest *forest = forest_init();
-    struct tree *tree = NULL;
-    struct tree *start_tree = NULL;
-
-    // Example of creating a tree from sentence: "Have a good day!"
-    // Internally this adds new words to the wordbank
-    tree_insert(
-        forest,         // <- forest wrapper with internal tracking
-        "Have",         // <- input sequence item 0
-        strlen("Have"), // <- length of input
-        0               // <- depth (item 0)
-    );
-    tree_insert(forest, "a", strlen("a"), 1);
-    tree_insert(forest, "good", strlen("good"), 2);
-    tree_insert(forest, "day!", strlen("day!"), 3);
-
-    printf("last_item: %s\n", f->last_item->word->data);
-
-    // Example of inserting a word into the wordbank, detached from any tree
-    struct word *w;
-    w = word_insert(forest, "Test123", strlen("Test123"));
-    // Example of searching for a word in the wordbank
-    w = word_find(forest, "Test123", strlen("Test123"));
-    if(w) {
-        printf("Found word: %s\n", w->data);
-    }
-    return 0;
-}
-
-```
+# Concepts
+* Data is stored in a `datatree` binary tree.
+* Each `datatree` contains a list of `sequence` references back to it
+(`sequence` references are internally stored as a binary tree too).
+* A `sequence` is a series of inputs that are stored in order of input and
+reference a `datatree` item.
+* Each `sequence` holds references to previous and next items, which are items that
+were seen before (previous) or after (next) in an input sequence.
+* A `sequence` is held within a `container` binary tree, which provide a quick way
+to determine if a word is in a `sequence` at a given depth.
+* A `container` is sorted by the `sequence`'s `datatree` data reference.
+* Depth refers to the index of the order of the input sequence. For example, a
+sequence of input: `Hello,` `World!`: `Hello,` is at depth 0 while `World!` is
+at depth 1.
+* A `mesh` acts as a wrapper containing `datatree`, `sequence`, and `container`.
+It simplifies the number of function arguments needed since they are contained
+within it's structure. Works similar to a class with local public variables.
 
 
 # Todo

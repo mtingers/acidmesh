@@ -3,16 +3,16 @@
 #include <unistd.h>
 #include <string.h>
 #include "util.h"
-#include "forest.h"
-#include "wordbank.h"
+#include "mesh.h"
+#include "datatree.h"
 #include "container.h"
 #include "context.h"
 
-struct context *ctx_init()
+struct context *ctx_init(void)
 {
     struct context *c = safe_malloc(sizeof(*c), __LINE__);
-    c->trees_len = 0;
-    c->trees = NULL;
+    c->seqs_len = 0;
+    c->seqs = NULL;
     c->prev_ctx = NULL;
     c->next_ctx = NULL;
     return c;

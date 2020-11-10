@@ -1,10 +1,10 @@
 #
-# Test the wordmesh python C extension via Python wrapper
+# Test the acidmesh python C extension via Python wrapper
 #
 
-from wordmesh import Forest
+from acidmesh import Mesh
 
-f = Forest()
+f = Mesh()
 
 words = [
     ("Hello,", "world!"),
@@ -15,7 +15,7 @@ words = [
 for w in words:
     i = 0
     for x in w:
-        f.tree_insert(x, len(x), i)
+        f.sequence_insert(x, len(x), i)
         i += 1
     f.link_last_contexts()
 

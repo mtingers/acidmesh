@@ -4,15 +4,15 @@
 #include <string.h>
 #include <assert.h>
 #include "util.h"
-#include "forest.h"
-#include "wordbank.h"
+#include "mesh.h"
+#include "datatree.h"
 #include "container.h"
 
-struct container *container_init()
+struct container *container_init(void)
 {
     struct container *c = safe_malloc(sizeof(*c), __LINE__);
     c->count = 0;
-    c->tree = NULL;
+    c->seq = NULL;
     c->left = NULL;
     c->right = NULL;
     return c;
@@ -22,14 +22,14 @@ void dump_container(struct container *c, size_t depth, size_t indent)
 {
     size_t i = 0;
     assert(c);
-    assert(c->tree);
-    assert(c->tree->word);
-    assert(c->tree->word->data);
+    assert(c->seq);
+    assert(c->seq->data);
+    assert(c->seq->data->data);
     printf("depth:%lu| ", depth);
     for(i = 0; i < indent*2; i++) {
         printf(" ");
     }
-    printf("%s\n", c->tree->word->data);
+    printf("%s\n", c->seq->data->data);
     if(c->left) {
         dump_container(c->left, depth, indent+1);
     }
