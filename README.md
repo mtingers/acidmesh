@@ -30,6 +30,41 @@ within it's structure. Works similar to a class with local public variables.
 
 ## Example Usage
 
+### Python
+
+Setup and install from source:
+```bash
+python3 -m venv venv
+. venv/bin/activate
+cd src/
+make py
+```
+
+Example script:
+```python
+from wordmesh import Forest
+
+f = Forest()
+
+words = [
+    ("Hello,", "world!"),
+    ("Hello,", "how", "are", "you?"),
+    ('What', 'time', 'is', 'it?'),
+]
+
+for w in words:
+    depth = 0
+    for x in w:
+        f.tree_insert(x, len(x), depth)
+        depth += 1
+    f.link_last_contexts()
+
+f.dump()
+```
+
+
+### Direct C
+
 See [src/forest.c](/src/forest.c#L220) `test_forest()` function for a full example of compiling
 a dataset.
 
