@@ -24,22 +24,22 @@ Example script:
 ```python
 from acidmesh import Mesh
 
-f = Mesh()
+mesh = Mesh()
 
-words = [
+sentences = (
     ("Hello,", "world!"),
     ("Hello,", "how", "are", "you?"),
     ('What', 'time', 'is', 'it?'),
-]
+)
 
-for w in words:
+for sentence in sentences:
     depth = 0
-    for x in w:
-        f.sequence_insert(x, len(x), depth)
+    for word in sentence:
+        mesh.sequence_insert(x, len(x), depth)
         depth += 1
-    f.link_last_contexts()
+    mesh.link_last_contexts()
 
-f.dump()
+mesh.dump()
 ```
 
 
