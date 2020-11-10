@@ -244,14 +244,19 @@ void dump_tree(struct forest *f)
     }
     dump_words(f->wb->words, 0);
     for(i = 0; i < f->container_len; i++) {
-        printf("depth-word-count:%lu|%lu\n", i, f->containers[i]->count);
+        printf("depth-word-count:%lu|%lu\n", i, f->containers[i]->count-1);
     }
-    printf("Total words: %lu\n", f->wb->count);
-}
-
-int test_forest_py()
-{
-    return 0;
+    printf("Total words: %lu\n", f->wb->count-1);
+    printf("Total contexts:%lu\n", f->ctxs_len-1);
+    printf("Context samples:\n");
+    size_t j = 0;
+    for(i = 1; i < f->ctxs_len; i++) {
+        printf("    ");
+        for(j = 0; j < f->ctxs[i]->trees_len; j++) {
+            printf("%s ", f->ctxs[i]->trees[j]->word->data);
+        }
+        printf("\n");
+    }
 }
 
 #ifdef TEST_FOREST
@@ -339,15 +344,6 @@ void test_forest(const char *data_directory)
     dump_tree(f);
     printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n",
         time_total, time_avg, time_min, time_max);
-    printf("total_contexts:%lu\n", f->ctxs_len);
-    printf("context sample:\n");
-    size_t j = 0;
-    for(i = 2; i < 5; i++) {
-        for(j = 0; j < f->ctxs[i]->trees_len; j++) {
-            printf("%s ", f->ctxs[i]->trees[j]->word->data);
-        }
-        printf("\n");
-    }
 }
 
 int main(int argc, char **argv)

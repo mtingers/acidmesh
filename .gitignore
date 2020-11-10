@@ -57,3 +57,5 @@ bin/
 .DS_Store
 *RC_*
 *_RC_*
+__pycache__
+*.pyc

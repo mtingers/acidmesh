@@ -25,5 +25,11 @@ forest.o:  forest.c container.h context.h util.h forest.h wordbank.h
 wordbank.o:  wordbank.c container.h context.h util.h forest.h wordbank.h
 	$(CC) $(CFLAGS) -c wordbank.c
 
+py:
+	rm -r build || echo
+	python setup.py build
+	python setup.py install
+
 clean:
+	rm -r build || echo
 	rm -v *.o 

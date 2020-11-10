@@ -27,5 +27,6 @@ void dump_tree(struct forest *f);
 void tree_insert(struct forest *f, const char *data, size_t data_len, size_t depth);
 struct tree *tree_init(struct word *w, size_t depth);
 void tree_add_parent(struct tree *t, struct tree *parent);
+void link_last_contexts(struct forest *f);
 
 #endif
