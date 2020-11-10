@@ -14,15 +14,14 @@
 struct forest *forest_init()
 {
     struct forest *f = safe_malloc(sizeof(*f), __LINE__);
-    f->containers = safe_malloc(sizeof(*f->containers), __LINE__);
-    f->containers[0] = container_init();
-    f->container_len = 1;
+    f->containers = NULL; //safe_malloc(sizeof(*f->containers), __LINE__);
+    //f->containers[0] = container_init();
+    f->container_len = 0; //1;
     f->wb = wordbank_init();
     f->first_item = NULL;
     f->last_item = NULL;
     f->ctxs_len = 0;
     f->ctxs = NULL;
-    //f->ctx_use_prev = 0;
     return f;
 }
 
@@ -95,18 +94,37 @@ void tree_insert(struct forest *f, const char *data, size_t data_len, size_t dep
 
     // When a new depth is reached, expand
     if(f->container_len < depth+1) {
+        if(f->container_len+1 < depth) {
+            fprintf(stderr,
+                "ERROR: Programmer error: depth jumped greater than +1 from previous max depth (%lu->%lu).\n",
+                f->container_len, depth);
+            exit(1);
+        }
         DEBUG_PRINT(("tree_insert(): expand containers: %lu -> %lu\n",
             f->container_len, depth));
-        f->container_len++;
-        f->containers = safe_realloc(f->containers,
-            sizeof(*f->containers)*f->container_len, __LINE__);
+        if(f->container_len < 1) { //!f->containers) {
+            f->containers = safe_malloc(sizeof(*f->containers)*(depth+1), __LINE__);
+            for(i = 0; i <= depth; i++) {
+                f->containers[i] = NULL; //container_init();
+            }
+        } else {
+            f->containers = safe_realloc(f->containers,
+                sizeof(*f->containers)*(depth+1), __LINE__);
+            for(i = f->container_len; i <= depth; i++) {
+                f->containers[i] = NULL; //container_init();
+            }
+        }
+        f->container_len = depth+1;
         f->containers[depth] = container_init();
         f->containers[depth]->count++;
+    } else {
+        //printf("DONT_EXPAND: %lu %lu\n", f->container_len, depth);
     }
-
     t = tree_init(w, depth);
     DEBUG_PRINT(("tree_insert(): tree_init(): %s %lu\n", t->word->data, depth));
-
+    if(!f->containers[depth]) {
+        f->containers[depth] = container_init();
+    }
     if(!f->containers[depth]->tree) {
         DEBUG_PRINT(("tree_insert(): !f->containers[depth]->tree\n"));
         // The 1st item in this container, so simply add the tree
@@ -179,8 +197,10 @@ void tree_insert(struct forest *f, const char *data, size_t data_len, size_t dep
         }
     }
     if(parent_tree) {
+        DEBUG_PRINT(("tree_add_parent(): parent_tree\n"));
         tree_add_parent(return_tree, parent_tree);
     } else {
+        DEBUG_PRINT(("tree_add_parent(): return_tree\n"));
         tree_add_parent(return_tree, return_tree);
     }
     // Add this tree reference (word at this depth) to the word itself for

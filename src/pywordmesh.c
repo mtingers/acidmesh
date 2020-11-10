@@ -15,12 +15,11 @@ static PyObject *pym_dump(PyObject *self, PyObject *args)
         return NULL;
     }
     if(i >= g_forests_len) {
-        printf("Invalid forest index\n");
         PyErr_SetString(PyExc_ValueError, "ERROR: Invalid forest index");
         return NULL;
     }
     dump_tree(g_forests[i]);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject *pym_link_last_contexts(PyObject *self, PyObject *args)
@@ -30,12 +29,11 @@ static PyObject *pym_link_last_contexts(PyObject *self, PyObject *args)
         return NULL;
     }
     if(i >= g_forests_len) {
-        printf("Invalid forest index\n");
         PyErr_SetString(PyExc_ValueError, "ERROR: Invalid forest index");
         return NULL;
     }
     link_last_contexts(g_forests[i]);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -51,7 +49,7 @@ static PyObject *pym_forest_del(PyObject *self, PyObject *args)
             g_forests[i] = NULL;
         }
     }
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject *pym_tree_insert(PyObject *self, PyObject *args)
@@ -65,26 +63,22 @@ static PyObject *pym_tree_insert(PyObject *self, PyObject *args)
         return NULL;
     }
     if(i >= g_forests_len) {
-        printf("Invalid forest index\n");
         PyErr_SetString(PyExc_ValueError, "ERROR: Invalid forest index");
         return NULL;
     }
     f = g_forests[i];
     tree_insert(f, s, slen, index);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
 static PyObject *pym_wordmesh(PyObject *self, PyObject *args)
 {
-    PyObject *result = NULL;
     char *str = NULL;
     if(!PyArg_ParseTuple(args, "s", &str)) {
         return NULL;
     }
-    printf("Hello, wordmesh! %s\n", str);
-    result = Py_None;
-    return result; //PyLong_FromLong(0);
+    Py_RETURN_NONE;
 }
 
 static PyObject *pym_forest(PyObject *self, PyObject *args)
@@ -100,7 +94,6 @@ static PyObject *pym_forest(PyObject *self, PyObject *args)
     g_forests_len++;
     return PyLong_FromLong(g_forests_len-1);
 }
-
 
 //
 // Initialization section

@@ -15,11 +15,10 @@ struct word *word_init(const char *data, size_t len)
     w->trees_len = 0;
     w->trees = NULL;
     w->len = len;
-    w->data = safe_malloc(strlen(data)+1, __LINE__);
+    w->data = safe_malloc(len+1, __LINE__);
     memcpy(w->data, data, len);
     w->data[len] = '\0';
     return w;
-
 }
 
 struct wordbank *wordbank_init()
@@ -38,12 +37,15 @@ void word_add_tree(struct word *w, struct tree *t)
             // no references exist at this depth, so allocate to this depth
             // then NULL out those that don't exist yet
             w->trees = safe_malloc(sizeof(*w->trees)*(t->depth+1), __LINE__);
-            for(i = 0; i < t->depth; i++) {
+            for(i = 0; i <= t->depth; i++) {
                 w->trees[i] = NULL;
             }
         } else {
             w->trees = safe_realloc(w->trees,
                 sizeof(*w->trees)*(t->depth+1), __LINE__);
+            for(i = w->trees_len; i <= t->depth; i++) {
+                w->trees[i] = NULL;
+            }
         }
         w->trees[t->depth] = t;
         w->trees_len = t->depth+1;
