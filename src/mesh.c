@@ -14,10 +14,9 @@
 struct mesh *mesh_init(void)
 {
     struct mesh *f = safe_malloc(sizeof(*f), __LINE__);
-    f->containers = NULL; //safe_malloc(sizeof(*f->containers), __LINE__);
-    //f->containers[0] = container_init();
-    f->container_len = 0; //1;
-    f->wb = datatree_init();
+    f->containers = NULL;
+    f->container_len = 0;
+    f->dt = datatree_init();
     f->first_item = NULL;
     f->last_item = NULL;
     f->ctxs_len = 0;
@@ -32,6 +31,7 @@ void sequence_add_parent(struct sequence *s, struct sequence *parent)
     if(!s->parents) {
         s->parents = container_init();
         s->parents->seq = parent;
+        s->parents->count++;
         return;
     }
     cur = s->parents;
@@ -42,6 +42,7 @@ void sequence_add_parent(struct sequence *s, struct sequence *parent)
             if(!cur->right) {
                 cur->right = container_init();
                 cur->right->seq = parent;
+                s->parents->count++;
                 return;
             }
             cur = cur->right;
@@ -49,6 +50,7 @@ void sequence_add_parent(struct sequence *s, struct sequence *parent)
             if(!cur->left) {
                 cur->left = container_init();
                 cur->left->seq = parent;
+                s->parents->count++;
                 return;
             }
             cur = cur->left;
@@ -192,7 +194,8 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
                 sizeof(*s->prevs)*(s->prev_len+1),
                 __LINE__
             );
-            s->prevs[s->prev_len] = s;
+            //s->prevs[s->prev_len] = s;
+            s->prevs[s->prev_len] = prev_seq;
             s->prev_len++;
         }
     }
@@ -238,8 +241,8 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
 void link_last_contexts(struct mesh *f)
 {
     if(f->ctxs_len > 1) {
-        f->ctxs[f->ctxs_len-2]->next_ctx = f->ctxs[f->ctxs_len-1]; 
-        f->ctxs[f->ctxs_len-1]->prev_ctx = f->ctxs[f->ctxs_len-2]; 
+        f->ctxs[f->ctxs_len-2]->next_ctx = f->ctxs[f->ctxs_len-1];
+        f->ctxs[f->ctxs_len-1]->prev_ctx = f->ctxs[f->ctxs_len-2];
     }
 }
 
@@ -262,21 +265,24 @@ void dump_sequence(struct mesh *f)
     for(i = 0; i < f->container_len; i++) {
         dump_container(f->containers[i], i, 0);
     }
-    dump_datas(f->wb->datas, 0);
+    dump_datas(f->dt->datas, 0);
     for(i = 0; i < f->container_len; i++) {
         printf("depth-data-count:%lu|%lu\n", i, f->containers[i]->count-1);
     }
-    printf("Total datas: %lu\n", f->wb->count-1);
-    printf("Total contexts:%lu\n", f->ctxs_len-1);
-    printf("Context samples:\n");
     size_t j = 0;
+    int max = 10;
+    printf("Context samples:\n");
     for(i = 1; i < f->ctxs_len; i++) {
+        if(max-- < 1)
+            break;
         printf("    ");
         for(j = 0; j < f->ctxs[i]->seqs_len; j++) {
             printf("%s ", f->ctxs[i]->seqs[j]->data->data);
         }
         printf("\n");
     }
+    printf("Total datas: %lu\n", f->dt->count-1);
+    printf("Total contexts:%lu\n", f->ctxs_len-1);
 }
 
 #ifdef TEST_FOREST
@@ -307,7 +313,7 @@ void test_mesh(const char *data_directory)
         find = strstr(namelist[n]->d_name, ".dl");
         if(!find) continue;
         if(n % 1000 == 0) {
-            printf("%d/%d: data-count:%lu\n", nn-n, nn, f->wb->count);
+            printf("%d/%d: data-count:%lu\n", nn-n, nn, f->dt->count);
         }
         start = clock();
         fd = file_open(namelist[n]->d_name, "rb", 1);

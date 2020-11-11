@@ -35,7 +35,7 @@ sentences = (
 for sentence in sentences:
     depth = 0
     for word in sentence:
-        mesh.sequence_insert(x, len(x), depth)
+        mesh.sequence_insert(word, len(word), depth)
         depth += 1
     mesh.link_last_contexts()
 

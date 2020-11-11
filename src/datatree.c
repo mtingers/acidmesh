@@ -23,10 +23,10 @@ struct data *data_init(const char *data, size_t len)
 
 struct datatree *datatree_init()
 {
-    struct datatree *wb = safe_malloc(sizeof(*wb), __LINE__);
-    wb->count = 1;
-    wb->datas = data_init("]", 1);
-    return wb;
+    struct datatree *dt = safe_malloc(sizeof(*dt), __LINE__);
+    dt->count = 1;
+    dt->datas = data_init("]", 1);
+    return dt;
 }
 
 void data_add_sequence(struct data *w, struct sequence *s)
@@ -59,27 +59,27 @@ void data_add_sequence(struct data *w, struct sequence *s)
 
 struct data *data_insert(struct mesh *f, const char *data, size_t len)
 {
-    return _data_insert(f->wb, data, len);
+    return _data_insert(f->dt, data, len);
 }
 
-struct data *_data_insert(struct datatree *wb, const char *data, size_t len)
+struct data *_data_insert(struct datatree *dt, const char *data, size_t len)
 {
     int rc;
-    struct data *cur = wb->datas;
-    assert(wb->datas != NULL);
+    struct data *cur = dt->datas;
+    assert(dt->datas != NULL);
     while(cur) {
         rc = bncmp(data, cur->data, len, cur->len);
         if(rc < 0) {
             if(!cur->left) {
                 cur->left = data_init(data, len);
-                wb->count++;
+                dt->count++;
                 return cur->left;
             }
             cur = cur->left;
         } else if(rc > 0) {
             if(!cur->right) {
                 cur->right = data_init(data, len);
-                wb->count++;
+                dt->count++;
                 return cur->right;
             }
             cur = cur->right;
@@ -95,8 +95,8 @@ struct data *_data_insert(struct datatree *wb, const char *data, size_t len)
 struct data *data_find(struct mesh *f, const char *data, size_t len)
 {
     int rc;
-    struct data *cur = f->wb->datas;
-    assert(f->wb->datas);
+    struct data *cur = f->dt->datas;
+    assert(f->dt->datas);
     while(cur) {
         rc = bncmp(data, cur->data, len, cur->len);
         if(rc < 0) {

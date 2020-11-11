@@ -14,7 +14,7 @@ struct sequence {
 struct mesh {
     size_t container_len;
     struct container **containers;
-    struct datatree *wb;
+    struct datatree *dt;
     struct sequence *first_item;
     struct sequence *last_item;
     size_t ctxs_len;

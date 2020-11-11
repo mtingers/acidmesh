@@ -18,7 +18,7 @@ struct datatree {
 };
 
 struct data *data_init(const char *data, size_t len);
-struct datatree *datatree_init();
+struct datatree *datatree_init(void);
 struct data *data_insert(struct mesh *f, const char *data, size_t len);
 struct data *_data_insert(struct datatree *wb, const char *data, size_t len);
 struct data *data_find(struct mesh *f, const char *data, size_t len);
