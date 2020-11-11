@@ -114,19 +114,20 @@ static PyObject *get_nexts_dict(struct sequence *s, size_t depth)
         if(cur->parents && cur->parents->count > 0) {
             ancestors = PyList_New(cur->parents->count);
             get_ancestors(ancestors, cur->parents, 0);
-            sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:O}",
+            //sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:O}",
+            sdict = Py_BuildValue("{s:s, s:k, s:O, s:O}",
                 "data", cur->data->data,
                 "depth", cur->depth,
                 "nexts", get_nexts_dict(cur, depth+1),
-                "prevs", get_prevs_dict(cur, depth+1),
+                //"prevs", get_prevs_dict(cur, depth+1),
                 "ancestors", ancestors
             );
         } else {
-            sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:[]}",
+            sdict = Py_BuildValue("{s:s, s:k, s:O, s:[]}",
                 "data", cur->data->data,
                 "depth", cur->depth,
                 "nexts", get_nexts_dict(cur, depth+1),
-                "prevs", get_prevs_dict(cur, depth+1),
+                //"prevs", get_prevs_dict(cur, depth+1),
                 "ancestors"
             );
         }
@@ -160,19 +161,19 @@ static PyObject *get_prevs_dict(struct sequence *s, size_t depth)
         if(cur->parents && cur->parents->count > 0) {
             ancestors = PyList_New(cur->parents->count);
             get_ancestors(ancestors, cur->parents, 0);
-            sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:O}",
+            sdict = Py_BuildValue("{s:s, s:k, s:O, s:O}",
                 "data", cur->data->data,
                 "depth", cur->depth,
                 "prevs", get_prevs_dict(cur, depth+1),
-                "nexts", get_nexts_dict(cur, depth+1),
+                //"nexts", get_nexts_dict(cur, depth+1),
                 "ancestors", ancestors
             );
         } else {
-            sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:[]}",
+            sdict = Py_BuildValue("{s:s, s:k, s:O, s:[]}",
                 "data", cur->data->data,
                 "depth", cur->depth,
                 "prevs", get_prevs_dict(cur, depth+1),
-                "nexts", get_nexts_dict(cur, depth+1),
+                //"nexts", get_nexts_dict(cur, depth+1),
                 "ancestors"
             );
 

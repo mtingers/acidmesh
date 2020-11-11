@@ -25,6 +25,7 @@ struct datatree *datatree_init()
 {
     struct datatree *dt = safe_malloc(sizeof(*dt), __LINE__);
     dt->count = 1;
+    // seed the tree with a middle value
     dt->datas = data_init("]", 1);
     return dt;
 }

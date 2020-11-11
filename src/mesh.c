@@ -119,8 +119,6 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
         f->container_len = depth+1;
         f->containers[depth] = container_init();
         f->containers[depth]->count++;
-    } else {
-        //printf("DONT_EXPAND: %lu %lu\n", f->container_len, depth);
     }
     s = sequence_init(w, depth);
     DEBUG_PRINT(("sequence_insert(): sequence_init(): %s %lu\n", s->data->data, depth));
@@ -174,29 +172,57 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
         DEBUG_PRINT(("sequence_insert(): prev_seq\n"));
         // Check if this link already exists in both directions
         for(i = 0; i < prev_seq->next_len; i++) {
-            if(bncmp(prev_seq->nexts[i]->data->data, s->data->data,
-                    prev_seq->nexts[i]->data->len, s->data->len) == 0) {
+            if(prev_seq->nexts[i] == return_seq) {
+                //if(bncmp(prev_seq->nexts[i]->data->data, s->data->data,
+                //    prev_seq->nexts[i]->data->len, s->data->len) == 0) {
                 has_been_linked = 1;
                 break;
             }
         }
         if(has_been_linked < 1) {
             DEBUG_PRINT(("sequence_insert(): !found-link\n"));
-            prev_seq->nexts = safe_realloc(
-                prev_seq->nexts,
-                sizeof(*prev_seq->nexts)*(prev_seq->next_len+1),
-                __LINE__
-            );
-            prev_seq->nexts[prev_seq->next_len] = s;
+            if(prev_seq->next_len < 1) {
+                prev_seq->nexts = safe_malloc(
+                    sizeof(*prev_seq->nexts)*(prev_seq->next_len+1),
+                    __LINE__
+                );
+
+            } else {
+                prev_seq->nexts = safe_realloc(
+                    prev_seq->nexts,
+                    sizeof(*prev_seq->nexts)*(prev_seq->next_len+1),
+                    __LINE__
+                );
+            }
+            prev_seq->nexts[prev_seq->next_len] = return_seq;
             prev_seq->next_len++;
-            s->prevs = safe_realloc(
-                s->prevs,
-                sizeof(*s->prevs)*(s->prev_len+1),
-                __LINE__
-            );
+        }
+        has_been_linked = 0;
+        for(i = 0; i < return_seq->prev_len; i++) {
+            if(return_seq->prevs[i] == prev_seq) {
+                //if(bncmp(prev_seq->nexts[i]->data->data, s->data->data,
+                //    prev_seq->nexts[i]->data->len, s->data->len) == 0) {
+                has_been_linked = 1;
+                break;
+            }
+        }
+        if(has_been_linked < 1) {
+            if(return_seq->prev_len < 1) {
+                return_seq->prevs = safe_malloc(
+                    sizeof(*return_seq->prevs)*(return_seq->prev_len+1),
+                    __LINE__
+                );
+
+            } else {
+                return_seq->prevs = safe_realloc(
+                    return_seq->prevs,
+                    sizeof(*return_seq->prevs)*(return_seq->prev_len+1),
+                    __LINE__
+                );
+            }
             //s->prevs[s->prev_len] = s;
-            s->prevs[s->prev_len] = prev_seq;
-            s->prev_len++;
+            return_seq->prevs[return_seq->prev_len] = prev_seq;
+            return_seq->prev_len++;
         }
     }
     if(parent_seq) {
