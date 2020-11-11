@@ -35,7 +35,7 @@ sentences = (
 for sentence in sentences:
     depth = 0
     for word in sentence:
-        mesh.sequence_insert(word, len(word), depth)
+        mesh.sequence_insert(word, depth)
         depth += 1
     mesh.link_last_contexts()
 
@@ -43,7 +43,7 @@ mesh.dump()
 
 finds = ('Hello,', 'What', 'are', 'is')
 for find in finds:
-    f = mesh.data_find(find, len(find));
+    f = mesh.data_find(find);
     pprint(f)
 ```
 

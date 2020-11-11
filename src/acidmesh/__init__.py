@@ -7,8 +7,8 @@ class Mesh:
     def __init__(self):
         self.mesh_id = cwm.mesh()
 
-    def sequence_insert(self, data, data_len, index):
-        cwm.sequence_insert(self.mesh_id, data, data_len, index)
+    def sequence_insert(self, data, index):
+        cwm.sequence_insert(self.mesh_id, data, len(data), index)
 
     def dump(self):
         cwm.dump(self.mesh_id)
@@ -19,6 +19,6 @@ class Mesh:
     def delete(self):
         cwm.mesh_del(self.mesh_id)
 
-    def data_find(self, data, data_len):
-        return cwm.data_find(self.mesh_id, data, data_len)
+    def data_find(self, data):
+        return cwm.data_find(self.mesh_id, data, len(data))
 
