@@ -216,14 +216,16 @@ static PyObject *pym_data_find(PyObject *self, PyObject *args)
             if(cur->parents && cur->depth > 0) {
                 ancestors = PyList_New(cur->parents->count);
                 get_ancestors(ancestors, cur->parents, 0);
-                sdict = Py_BuildValue("{s:k, s:O, s:O, s:O}",
+                sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:O}",
+                    "data", cur->data->data,
                     "depth", cur->depth,
                     "nexts", get_nexts_dict(cur, 0),
                     "prevs", get_prevs_dict(cur, 0),
                     "ancestors", ancestors
                 );
             } else {
-                sdict = Py_BuildValue("{s:k, s:O, s:O, s:[]}",
+                sdict = Py_BuildValue("{s:s, s:k, s:O, s:O, s:[]}",
+                    "data", cur->data->data,
                     "depth", cur->depth,
                     "nexts", get_nexts_dict(cur, 0),
                     "prevs", get_prevs_dict(cur, 0),
