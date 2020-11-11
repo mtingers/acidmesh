@@ -326,7 +326,6 @@ void test_mesh(const char *data_directory)
         fd->read(fd, fd->size, txt);
         fd->close(fd);
         memset(buf, '\0', sizeof(*buf)*BUF_SIZE);
-        //f->ctx_use_prev = 0;
         for(x = 0; x < fd->size; x++) {
             buf[buf_i] = txt[x];
             buf_i++;
@@ -343,7 +342,6 @@ void test_mesh(const char *data_directory)
                     sequence_insert(f, token, strlen(token), i);
                     token = strtok_r(NULL, " ", &rest);
                     i++;
-                    //f->ctx_use_prev = 1;
                 }
                 // TODO: Some of these are List_of_ or Index_of_ with no \0
                 // delimiter for sentences (only newline).
