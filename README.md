@@ -40,6 +40,11 @@ for sentence in sentences:
     mesh.link_last_contexts()
 
 mesh.dump()
+
+finds = ('Hello,', 'What', 'are', 'is')
+for find in finds:
+    f = mesh.data_find(find, len(find));
+    pprint(f)
 ```
 
 
