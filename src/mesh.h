@@ -31,5 +31,5 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
 struct sequence *sequence_init(struct data *w, size_t depth);
 void sequence_add_parent(struct sequence *t, struct sequence *parent);
 void link_last_contexts(struct mesh *f);
-void datatree_stats(struct mesh *m);
+void datatree_stats(struct mesh *m, int print_top_bottom);
 #endif

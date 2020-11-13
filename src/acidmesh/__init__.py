@@ -22,8 +22,10 @@ class Mesh:
     def data_find(self, data):
         return cwm.data_find(self.mesh_id, data, len(data))
 
-    def generate(self, s1, s2):
-        cwm.generate(self.mesh_id, s1, len(s1), s2, len(s2))
+    def generate(self, s1, s2, nitems):
+        return cwm.generate(self.mesh_id, s1, len(s1), s2, len(s2), nitems)
 
-    def data_stats(self):
-        cwm.data_stats(self.mesh_id)
+    def datatree_stats(self, print_top_bottom):
+        if print_top_bottom: # eh, try to handle None, True/False, -n/0/+n
+            print_top_bottom = 1
+        cwm.datatree_stats(self.mesh_id, print_top_bottom)

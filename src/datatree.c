@@ -19,6 +19,8 @@ struct data *data_init(const char *data, size_t len)
     w->data = safe_malloc(len+1, __LINE__);
     memcpy(w->data, data, len);
     w->data[len] = '\0';
+    w->stats_count = 0;
+    w->stats_percent = 0.0;
     return w;
 }
 

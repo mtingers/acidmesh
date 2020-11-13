@@ -20,17 +20,18 @@ size_t size_t_rand_range(size_t lower, size_t upper)
     return (rand() % (upper - lower + 1)) + lower;
 }
 
-static PyObject *pym_data_stats(PyObject *self, PyObject *args)
+static PyObject *pym_datatree_stats(PyObject *self, PyObject *args)
 {
     size_t i = 0;
-    if(!PyArg_ParseTuple(args, "k", &i)) {
+    int print_top_bottom = 0;
+    if(!PyArg_ParseTuple(args, "ki", &i, &print_top_bottom)) {
         return NULL;
     }
     if(i >= g_meshs_len) {
         PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
         return NULL;
     }
-    datatree_stats(g_meshs[i]);
+    datatree_stats(g_meshs[i], print_top_bottom);
     Py_RETURN_NONE;
 }
 
@@ -210,129 +211,145 @@ static PyObject *get_prevs_dict(struct sequence *s, size_t depth)
     return pseqs;
 }
 
-void pym_generate_internal(struct mesh *m, const char *s, const char *s2, size_t slen, size_t s2len, int count, int max, size_t *not_rand, struct context **ctx_used, size_t ctx_used_n)
+void pym_generate_internal(
+        PyObject *return_list,
+        struct mesh *m,
+        const char *s1, const char *s2,
+        size_t slen1, size_t slen2,
+        size_t *used_ctxs, size_t used_ctxs_n, size_t max_used_ctxs)
 {
-    size_t i = 0, k = 0;
-    struct data *d = data_find(m, s, slen);
-    if(!d) {
-        return; //Py_RETURN_NONE;
-    }
-    size_t randn = 0;
-    struct sequence *cur = NULL;
-    struct context *ctx = NULL, *prev_ctx = NULL, *next_ctx = NULL;
-    struct context *ctx_available[10];
-    size_t ctx_available_n = 0;
+    // find the word in the datatree
+    struct data *d = data_find(m, s1, slen1);
+    size_t i = 0, j = 0, k = 0, l = 0, n = 0;
+    struct context *ctx = NULL;
+    struct sequence *seq = NULL;
     int found = 0;
-    size_t j = 0;
-    // search for s2 in d's associated sequences
+    struct context *prev_ctx = NULL;
+    struct context *next_ctx = NULL;
+    if(!d) {
+        //fprintf(stderr, "WARNING: No results for lookup: %s\n", s1);
+        return;
+    }
+    // pick a sequence that has > N contexts.
+    // NOTE: seqs first layer is by depth and can have NULLs
     for(i = 0; i < d->seqs_len; i++) {
-        if(d->seqs[i]) {
-            for(k = 0; k < d->sub_seqs_len[i]; k++) {
-                cur = d->seqs[i][k];
-                if(cur) {
-                    for(j = 0; j < cur->ctxs_len; j++) {
-                        ctx = cur->contexts[j];
-                        size_t h = 0;
-                        for(h = 0; h < ctx->seqs_len; h++) {
-                            if(s2len == ctx->seqs[h]->data->len) {
-                                if(bncmp(ctx->seqs[h]->data->data, s2, s2len, s2len) == 0) {
-                                    size_t z = 0;
-                                    int is_used = 0;
-                                    for(z = 0; z < ctx_used_n; z++) {
-                                        if(ctx_used[z] == ctx) {
-                                            is_used = 1;
-                                            break;
-                                        }
-                                    }
-                                    if(is_used < 1) {
-                                        ctx_available[ctx_available_n] = ctx;
-                                        ctx_used[ctx_used_n] = ctx;
-                                        ctx_used_n++;
-                                        ctx_available_n++;
-                                        if(ctx_available_n > 9) {
-                                            found = 1;
-                                            break;
-                                        }
-                                    } else {
-                                        printf("WAS_USED:\n");
-                                    }
-                                    //break;
-                                }
+        if(!d->seqs[i]) { continue; }
+        // Check eachs seqs->ctx counts for a suitable match
+        for(j = 0; j < d->sub_seqs_len[i]; j++) {
+            seq = d->seqs[i][j];
+            if(seq->ctxs_len < 1) { continue; seq = NULL; }
+            // Found a suitable > N contexts. Now we need to see if s2 also
+            // exists in any of these seq->contexts
+            // NOTE: a context has a list of sequences in order
+            for(k = 0; k < seq->ctxs_len; k++) {
+                if(!seq->contexts[k]->prev_ctx || !seq->contexts[k]->next_ctx) { continue; } // skip ones with little data
+                for(l = 0; l < seq->contexts[k]->seqs_len; l++) {
+                    if(bncmp(seq->contexts[k]->seqs[l]->data->data, s2,
+                            seq->contexts[k]->seqs[l]->data->len, slen2) == 0) {
+                        // Found a match, use this context if we haven't before
+                        // check used_ctxs to see if it's in it
+                        found = 0;
+                        for(n = 0; n < used_ctxs_n; n++) {
+                            if(used_ctxs[n] == seq->contexts[k]->context_id) {
+                                found = 1;
+                                break;
                             }
                         }
-                        if(found > 0)
-                            break;
+                        if(found < 1) {
+                            ctx = seq->contexts[k];
+                            goto found_ctx;
+                        }
                     }
                 }
-                if(found > 0)
-                    break;
             }
-        }
-        if(found > 0) {
-            break;
         }
     }
-    if(found < 1) {
-        printf("NOT_FOUND\n");
-    } else {
-        printf("FOUND_FOR: %s\n", d->data);
-        struct sequence *last_seq = NULL;
-        size_t last_rand = 0;
-        int rand_fail = 0;
-        printf("\n\n");
-        for(i = 0; i < 100; i++) {
-            //randn = size_t_rand_range(0, cur->ctxs_len-1);
-            randn = size_t_rand_range(0, ctx_available_n-1);
-            for(j = 0; j < (size_t)count; j++) {
-                last_rand = not_rand[j];
-                if(randn == last_rand)
-                    rand_fail = 1;
-            }
-            if(rand_fail < 1)
-                break;
+    // Reached end of loop, meaning goto found; was not done and nothing was
+    // found
+    //fprintf(stderr, "WARNING: No context results for lookup: %s\n", s1);
+    return;
+
+found_ctx:
+    prev_ctx = ctx->prev_ctx;
+    next_ctx = ctx->next_ctx;
+    size_t buffer_size = 0;
+    char *buffer = NULL;
+    for(i = 0; i < prev_ctx->seqs_len; i++) {
+        buffer_size += prev_ctx->seqs[i]->data->len;
+    }
+    for(i = 0; i < ctx->seqs_len; i++) {
+        buffer_size += ctx->seqs[i]->data->len;
+    }
+    for(i = 0; i < next_ctx->seqs_len; i++) {
+        buffer_size += next_ctx->seqs[i]->data->len;
+    }
+    buffer = safe_malloc(
+        sizeof(*buffer)*(buffer_size)+prev_ctx->seqs_len+ctx->seqs_len+next_ctx->seqs_len+1,
+        __LINE__
+    );
+
+    k = 0;
+    for(i = 0; i < prev_ctx->seqs_len; i++) {
+        for(j = 0; j < prev_ctx->seqs[i]->data->len; j++) {
+            if(prev_ctx->seqs[i]->data->data[j] == '\0') { break; }
+            buffer[k] = prev_ctx->seqs[i]->data->data[j];
+            k++;
         }
-        if(rand_fail > 0) {
-            //printf("NO_MORE_RANDOM: 0-%lu\n", cur->ctxs_len-1);
-            printf("NO_MORE_RANDOM: 0-%lu\n", ctx_available_n-1);
-            return;
+        buffer[k] = ' ';
+        k++;
+        //printf("%s ", prev_ctx->seqs[i]->data->data);
+    }
+    for(i = 0; i < ctx->seqs_len; i++) {
+        for(j = 0; j < ctx->seqs[i]->data->len; j++) {
+            if(ctx->seqs[i]->data->data[j] == '\0') { break; }
+            buffer[k] = ctx->seqs[i]->data->data[j];
+            k++;
         }
-        not_rand[count] = randn;
-        //printf("randn: %lu of %lu\n", randn, cur->ctxs_len);
-        printf("randn: %lu of %lu\n", randn, ctx_available_n);
-        //ctx = cur->contexts[randn];
-        ctx = ctx_available[randn]; //cur->contexts[randn];
-        prev_ctx = ctx->prev_ctx;
-        next_ctx = ctx->next_ctx;
-        if(prev_ctx) {
-            for(i = 0; i < prev_ctx->seqs_len; i++) {
-                printf("%s ", prev_ctx->seqs[i]->data->data);
-            }
+        buffer[k] = ' ';
+        k++;
+        //printf("%s ", ctx->seqs[i]->data->data);
+    }
+    for(i = 0; i < next_ctx->seqs_len; i++) {
+        for(j = 0; j < next_ctx->seqs[i]->data->len; j++) {
+            if(next_ctx->seqs[i]->data->data[j] == '\0') { break; }
+            buffer[k] = next_ctx->seqs[i]->data->data[j];
+            k++;
         }
-        for(i = 0; i < ctx->seqs_len; i++) {
-            printf("%s ", ctx->seqs[i]->data->data);
-        }
-        if(next_ctx) {
-            for(i = 0; i < next_ctx->seqs_len; i++) {
-                printf("%s ", next_ctx->seqs[i]->data->data);
-                last_seq = next_ctx->seqs[i];
-            }
-        }
-        printf("\n\n");
-        if(count < max)
-            pym_generate_internal(m, s2, s, s2len, slen, count+1, max, not_rand, ctx_used, ctx_used_n);
+        buffer[k] = ' ';
+        k++;
+        //printf("%s ", next_ctx->seqs[i]->data->data);
+    }
+    buffer[k] = '\0';
+    /*
+    for(i = 0; i < ctx->seqs_len; i++) {
+        printf("%s ", ctx->seqs[i]->data->data);
+    }
+    for(i = 0; i < next_ctx->seqs_len; i++) {
+        printf("%s ", next_ctx->seqs[i]->data->data);
+    }*/
+    PyObject *strs = Py_BuildValue("s", buffer);
+    safe_free(buffer, __LINE__);
+    PyList_Append(return_list, strs);
+    if(used_ctxs_n+3 < 10) {
+        used_ctxs[used_ctxs_n] = prev_ctx->context_id;
+        used_ctxs[used_ctxs_n+1] = ctx->context_id;
+        used_ctxs[used_ctxs_n+2] = next_ctx->context_id;
+        used_ctxs_n += 3;
+        pym_generate_internal(return_list, m, s1, s2, slen1, slen2, used_ctxs, used_ctxs_n, max_used_ctxs);
     }
 }
-
 static PyObject *pym_generate(PyObject *self, PyObject *args)
 {
-    srand(time(0));
     size_t i = 0;
     char *s = NULL;
     char *s2 = NULL;
     size_t slen = 0, s2len = 0;
     struct mesh *m = NULL;
-    struct context **ctx_used = safe_malloc(sizeof(*ctx_used)*10000, __LINE__);
-    if(!PyArg_ParseTuple(args, "ksksk", &i, &s, &slen, &s2, &s2len)) {
+    size_t used_ctxs_n = 0;
+    size_t max_used_ctxs = 0;
+
+    //srand(time(0));
+    if(!PyArg_ParseTuple(args, "kskskk", &i, &s, &slen, &s2, &s2len, &max_used_ctxs)) {
         return NULL;
     }
     if(i >= g_meshs_len) {
@@ -340,10 +357,13 @@ static PyObject *pym_generate(PyObject *self, PyObject *args)
         return NULL;
     }
     m = g_meshs[i];
-    size_t *not_rand = safe_malloc(sizeof(*not_rand), __LINE__);
-    not_rand[0] = 999999999999999999;
-    pym_generate_internal(m, s, s2, slen, s2len, 0, 4, not_rand, ctx_used, 0);
-    Py_RETURN_NONE;
+
+    size_t *used_ctxs = safe_malloc(sizeof(*used_ctxs)*max_used_ctxs, __LINE__);
+    PyObject *return_list = PyList_New(0);
+    pym_generate_internal(return_list, m, s, s2, slen, s2len, used_ctxs, used_ctxs_n, max_used_ctxs);
+
+    safe_free(used_ctxs, __LINE__);
+    return return_list;
 }
 
 
@@ -448,7 +468,7 @@ static PyMethodDef acidmesh_methods[] = {
     {"acidmesh_test", pym_acidmesh, METH_VARARGS, "The AcidMesh Python module."},
     {"generate", pym_generate, METH_VARARGS, "Generate sentences from basic input keywords."},
     {"mesh", pym_mesh, METH_VARARGS, "Create a new mesh."},
-    {"data_stats", pym_data_stats, METH_VARARGS, "Print stats on data word counts."},
+    {"datatree_stats", pym_datatree_stats, METH_VARARGS, "Print stats on data word counts."},
     {"mesh_del", pym_mesh_del, METH_VARARGS, "Delete a mesh."},
     {"sequence_insert", pym_sequence_insert, METH_VARARGS, "Insert a sequence."},
     {"dump", pym_dump, METH_VARARGS, "Print/dump the mesh."},

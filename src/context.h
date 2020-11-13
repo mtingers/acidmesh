@@ -3,6 +3,7 @@
 
 struct context {
     size_t seqs_len;
+    size_t context_id;
     struct sequence **seqs;
     struct context *prev_ctx;
     struct context *next_ctx;

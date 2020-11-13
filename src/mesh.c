@@ -326,6 +326,7 @@ void dump_sequence(struct mesh *f)
 
 struct dt_stat {
     char *data;
+    struct data *data_ptr;
     size_t count;
     double percent;
 };
@@ -339,6 +340,7 @@ void _datatree_stats(struct data *cur, struct dt_stat **stats, size_t *stats_n)
     stats[n] = safe_malloc(sizeof(**stats), __LINE__);
     stats[n]->data = cur->data;
     stats[n]->count = 0;
+    stats[n]->data_ptr = cur;
     for(i = 0; i < cur->seqs_len; i++) {
         stats[n]->count += cur->sub_seqs_len[i];
     }
@@ -362,26 +364,29 @@ int datatree_sort_cmp(const void *p1, const void *p2)
     return 0;
 }
 
-void datatree_stats(struct mesh *m)
+void datatree_stats(struct mesh *m, int print_top_bottom)
 {
     struct data *cur = m->dt->datas;
     struct dt_stat **stats = safe_malloc(sizeof(*stats)*(m->dt->count), __LINE__); ////NULL;
     size_t stats_n = 0;
     size_t i = 0;
-    //size_t total = 0;
-    printf("STATS\n");
     _datatree_stats(cur, stats, &stats_n);
-    printf("SORT: %lu\n", stats_n);
     qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
-    printf("PRINT\n");
     for(i = 0; i < stats_n; i++) {
         stats[i]->percent = (double)stats[i]->count/(double)m->total_sequence_data_refs * 100.0;
+        // add the stats to the datatree
+        stats[i]->data_ptr->stats_percent = stats[i]->percent;
+        stats[i]->data_ptr->stats_count = stats[i]->count;
     }
-    for(i = stats_n-1; i > stats_n-50; i--) {
-        printf("test: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
-    }
-    for(i = 0; i < 50; i++) {
-        printf("test: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+    if(print_top_bottom > 0) {
+        printf("---- top ----\n");
+        for(i = stats_n-1; i > stats_n-125; i--) {
+            printf("DATATREE_STATS: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+        }
+        printf("---- bottom ----\n");
+        for(i = 0; i < 25; i++) {
+            printf("DATATREE_STATS: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+        }
     }
 }
 
@@ -469,7 +474,7 @@ void test_mesh(const char *data_directory)
     time_avg = time_total/(double)nn;
     free(namelist);
     //dump_sequence(f);
-    datatree_stats(f);
+    datatree_stats(f, 0);
     printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n",
         time_total, time_avg, time_min, time_max);
 }

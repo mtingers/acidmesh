@@ -13,6 +13,8 @@ struct data {
     size_t len;
     size_t *sub_seqs_len;
     struct sequence ***seqs; // a list of seqs with depth as first key
+    size_t stats_count;
+    double stats_percent;
 };
 
 struct datatree {
