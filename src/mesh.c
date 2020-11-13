@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <assert.h>
 #include <time.h>
+#include <math.h>
 #include "util.h"
 #include "mesh.h"
 #include "datatree.h"
@@ -21,6 +22,7 @@ struct mesh *mesh_init(void)
     f->last_item = NULL;
     f->ctxs_len = 0;
     f->ctxs = NULL;
+    f->total_sequence_data_refs = 0;
     return f;
 }
 
@@ -234,7 +236,7 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
     }
     // Add this seq reference (data at this depth) to the data itself for
     // reverse lookups from a data.
-    data_add_sequence(w, return_seq);
+    data_add_sequence(f, w, return_seq);
 
     // Set the first seq in the sequence if depth == 0
     if(depth < 1) {
@@ -262,6 +264,15 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
         ctx->seqs[ctx->seqs_len] = return_seq;
         ctx->seqs_len++;
     }
+    // Now add the reverse lookup to the return_seq sequence
+    if(!return_seq->contexts) {
+        return_seq->contexts = safe_malloc(sizeof(*return_seq->contexts), __LINE__);
+    } else {
+        return_seq->contexts = safe_realloc(return_seq->contexts,
+            sizeof(*return_seq->contexts)*(return_seq->ctxs_len+1), __LINE__);
+    }
+    return_seq->contexts[return_seq->ctxs_len] = ctx;
+    return_seq->ctxs_len++;
 }
 
 void link_last_contexts(struct mesh *f)
@@ -282,6 +293,8 @@ struct sequence *sequence_init(struct data *w, size_t depth)
     s->next_len = 0;
     s->nexts = NULL;
     s->prevs = NULL;
+    s->ctxs_len = 0;
+    s->contexts = NULL;
     return s;
 }
 
@@ -311,6 +324,67 @@ void dump_sequence(struct mesh *f)
     printf("Total contexts:%lu\n", f->ctxs_len-1);
 }
 
+struct dt_stat {
+    char *data;
+    size_t count;
+    double percent;
+};
+
+void _datatree_stats(struct data *cur, struct dt_stat **stats, size_t *stats_n)
+{
+    assert(cur);
+    size_t n = *stats_n;
+    size_t i = 0;
+    *stats_n = n+1;
+    stats[n] = safe_malloc(sizeof(**stats), __LINE__);
+    stats[n]->data = cur->data;
+    stats[n]->count = 0;
+    for(i = 0; i < cur->seqs_len; i++) {
+        stats[n]->count += cur->sub_seqs_len[i];
+    }
+    if(cur->left) {
+        _datatree_stats(cur->left, stats, stats_n);
+    }
+    if(cur->right) {
+        _datatree_stats(cur->right, stats, stats_n);
+    }
+}
+
+int datatree_sort_cmp(const void *p1, const void *p2)
+{
+    struct dt_stat *d1 = *(struct dt_stat **)p1;
+    struct dt_stat *d2 = *(struct dt_stat **)p2;
+    if(d1->count < d2->count) {
+        return -1;
+    } else if(d1->count > d2->count) {
+        return 1;
+    }
+    return 0;
+}
+
+void datatree_stats(struct mesh *m)
+{
+    struct data *cur = m->dt->datas;
+    struct dt_stat **stats = safe_malloc(sizeof(*stats)*(m->dt->count), __LINE__); ////NULL;
+    size_t stats_n = 0;
+    size_t i = 0;
+    //size_t total = 0;
+    printf("STATS\n");
+    _datatree_stats(cur, stats, &stats_n);
+    printf("SORT: %lu\n", stats_n);
+    qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
+    printf("PRINT\n");
+    for(i = 0; i < stats_n; i++) {
+        stats[i]->percent = (double)stats[i]->count/(double)m->total_sequence_data_refs * 100.0;
+    }
+    for(i = stats_n-1; i > stats_n-50; i--) {
+        printf("test: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+    }
+    for(i = 0; i < 50; i++) {
+        printf("test: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+    }
+}
+
 #ifdef TEST_FOREST
 #define BUF_SIZE 1024*1024*4
 void test_mesh(const char *data_directory)
@@ -334,10 +408,13 @@ void test_mesh(const char *data_directory)
         perror("scandir");
         exit(1);
     }
-    // use partial: n = (int)(n/4);
+    // use partial:
+    //n = (int)(n/10);
     while(n--) {
         find = strstr(namelist[n]->d_name, ".dl");
         if(!find) continue;
+        if(strstr(namelist[n]->d_name, "List_of_")) continue;
+        if(strstr(namelist[n]->d_name, "Index_of_")) continue;
         if(n % 1000 == 0) {
             printf("%d/%d: data-count:%lu\n", nn-n, nn, f->dt->count);
         }
@@ -391,7 +468,8 @@ void test_mesh(const char *data_directory)
     }
     time_avg = time_total/(double)nn;
     free(namelist);
-    dump_sequence(f);
+    //dump_sequence(f);
+    datatree_stats(f);
     printf("total_time:%.2lf avg_time:%.6lf min_time:%.6lf max_time:%.6lf\n",
         time_total, time_avg, time_min, time_max);
 }

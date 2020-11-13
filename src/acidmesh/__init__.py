@@ -22,3 +22,8 @@ class Mesh:
     def data_find(self, data):
         return cwm.data_find(self.mesh_id, data, len(data))
 
+    def generate(self, s1, s2):
+        cwm.generate(self.mesh_id, s1, len(s1), s2, len(s2))
+
+    def data_stats(self):
+        cwm.data_stats(self.mesh_id)

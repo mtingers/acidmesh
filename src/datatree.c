@@ -13,6 +13,7 @@ struct data *data_init(const char *data, size_t len)
     w->left = NULL;
     w->right = NULL;
     w->seqs_len = 0;
+    w->sub_seqs_len = 0;
     w->seqs = NULL;
     w->len = len;
     w->data = safe_malloc(len+1, __LINE__);
@@ -30,31 +31,78 @@ struct datatree *datatree_init()
     return dt;
 }
 
-void data_add_sequence(struct data *w, struct sequence *s)
+// This is wrong because it overwrites by depth
+// should have been struct sequence *** not **
+//void data_add_sequence_old(struct data *w, struct sequence *s)
+//{
+//    size_t i = 0;
+//    if(s->depth+1 > w->seqs_len) {
+//        if(!w->seqs) {
+//            // no references exist at this depth, so allocate to this depth
+//            // then NULL out those that don't exist yet
+//            w->seqs = safe_malloc(sizeof(*w->seqs)*(s->depth+1), __LINE__);
+//            for(i = 0; i <= s->depth; i++) {
+//                w->seqs[i] = NULL;
+//            }
+//        } else {
+//            w->seqs = safe_realloc(w->seqs,
+//                sizeof(*w->seqs)*(s->depth+1), __LINE__);
+//            for(i = w->seqs_len; i <= s->depth; i++) {
+//                w->seqs[i] = NULL;
+//            }
+//        }
+//        w->seqs[s->depth] = s;
+//        w->seqs_len = s->depth+1;
+//    } else {
+//        // this depth exists, so we must check if it's NULL and add if so
+//        if(!w->seqs[s->depth]) {
+//            w->seqs[s->depth] = s;
+//        }
+//    }
+//}
+
+void data_add_sequence(struct mesh *m, struct data *w, struct sequence *s)
 {
     size_t i = 0;
+    m->total_sequence_data_refs++;
+    // ahhhhhhh!
     if(s->depth+1 > w->seqs_len) {
         if(!w->seqs) {
             // no references exist at this depth, so allocate to this depth
             // then NULL out those that don't exist yet
             w->seqs = safe_malloc(sizeof(*w->seqs)*(s->depth+1), __LINE__);
+            w->sub_seqs_len = safe_malloc(sizeof(*w->sub_seqs_len)*(s->depth+1), __LINE__);
             for(i = 0; i <= s->depth; i++) {
                 w->seqs[i] = NULL;
+                w->sub_seqs_len[i] = 0;
             }
+
         } else {
             w->seqs = safe_realloc(w->seqs,
                 sizeof(*w->seqs)*(s->depth+1), __LINE__);
+            w->sub_seqs_len = safe_realloc(w->sub_seqs_len,
+                    sizeof(*w->sub_seqs_len)*(s->depth+1), __LINE__);
             for(i = w->seqs_len; i <= s->depth; i++) {
                 w->seqs[i] = NULL;
+                w->sub_seqs_len[i] = 0;
             }
         }
-        w->seqs[s->depth] = s;
+        //w->seqs[s->depth] = s;
+        // Does not exist so we can simply expand and add another item
+        w->seqs[s->depth] = safe_malloc(sizeof(*w->seqs[s->depth]), __LINE__);
+        w->seqs[s->depth][0] = s;
+        w->sub_seqs_len[s->depth] = 1;
         w->seqs_len = s->depth+1;
     } else {
         // this depth exists, so we must check if it's NULL and add if so
         if(!w->seqs[s->depth]) {
-            w->seqs[s->depth] = s;
+            w->seqs[s->depth] = safe_malloc(sizeof(*w->seqs[s->depth]), __LINE__);
+            w->seqs[s->depth][0] = s;
+        } else {
+            w->seqs[s->depth] = safe_realloc(w->seqs[s->depth], sizeof(*w->seqs[s->depth])*(w->sub_seqs_len[s->depth]+1), __LINE__);
+            w->seqs[s->depth][w->sub_seqs_len[s->depth]] = s;
         }
+        w->sub_seqs_len[s->depth]++;
     }
 }
 
