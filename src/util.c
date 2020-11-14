@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "util.h"
 
 void *safe_realloc(void *ptr, size_t size, int lineno)
@@ -100,4 +101,73 @@ int bncmp(const char *s1, const char *s2, size_t s1_n, size_t s2_n)
     }
     return 0;
 }
+
+
+Tree *tree_init(void)
+{
+    Tree *t = safe_malloc(sizeof(*t), __LINE__);
+    t->p = NULL;
+    t->left = NULL;
+    t->right = NULL;
+    return t;
+}
+
+Tree *tree_find(Tree *t, const void *p, size_t plen, int (*compar)(const void *, const void *, size_t))
+{
+    Tree *cur = t;
+    int rc = 0;
+    while(cur) {
+        rc = compar(cur->p, p, plen);
+        if(rc < 0) {
+            if(!cur->left) {
+                return NULL;
+            }
+            cur = cur->left;
+        } else if(rc > 0) {
+            if(!cur->right) {
+                return NULL;
+            }
+            cur = cur->right;
+        } else {
+            // Found;
+            return cur;
+        }
+    }
+    // Not found
+    return NULL;
+}
+
+Tree *tree_insert(Tree *t, const void *p, size_t plen, int (*compar)(const void *, const void *, size_t))
+{
+    Tree *cur = t;
+    int rc = 0;
+    while(cur) {
+        rc = compar(cur->p, p, plen);
+        if(rc < 0) {
+            if(!cur->left) {
+                cur->left = tree_init();
+                cur->left->len = plen;
+                cur->left->p = safe_malloc(plen, __LINE__);
+                memcpy(cur->left->p, p, plen);
+                return cur->left;
+            }
+            cur = cur->left;
+        } else if(rc > 0) {
+            if(!cur->right) {
+                cur->right = tree_init();
+                cur->right->len = plen;
+                cur->right->p = safe_malloc(plen, __LINE__);
+                memcpy(cur->right->p, p, plen);
+                return cur->right;
+            }
+            cur = cur->right;
+        } else {
+            // Found;
+            return cur;
+        }
+    }
+    fprintf(stderr, "ERROR: Programmer error in tree_insert()\n");
+    exit(1);
+}
+
 
