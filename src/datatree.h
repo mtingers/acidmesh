@@ -4,6 +4,8 @@
 #include "mesh.h"
 
 
+// seqs[depth][index]
+
 struct data {
     char *data;
     struct data *left;
