@@ -32,4 +32,5 @@ struct sequence *sequence_init(struct data *w, size_t depth);
 void sequence_add_parent(struct sequence *t, struct sequence *parent);
 void link_last_contexts(struct mesh *f);
 void datatree_stats(struct mesh *m, int print_top_bottom);
+int datatree_sort_cmp(const void *p1, const void *p2);
 #endif

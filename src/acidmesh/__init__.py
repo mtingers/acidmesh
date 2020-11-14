@@ -29,3 +29,6 @@ class Mesh:
         if print_top_bottom: # eh, try to handle None, True/False, -n/0/+n
             print_top_bottom = 1
         cwm.datatree_stats(self.mesh_id, print_top_bottom)
+
+    def generate_response(self, x):
+        return cwm.generate_response(self.mesh_id, [str(i) for i in x])

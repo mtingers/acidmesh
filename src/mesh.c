@@ -12,6 +12,8 @@
 #include "container.h"
 #include "context.h"
 
+static int g_recalculate_datatree_stats = 0;
+
 struct mesh *mesh_init(void)
 {
     struct mesh *f = safe_malloc(sizeof(*f), __LINE__);
@@ -77,6 +79,9 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
     struct container *cur = NULL;
     int has_been_linked = 0;
     struct context *ctx = NULL;
+
+    // allow recalulation of datatree stats since a new item is added
+    g_recalculate_datatree_stats = 1;
 
     DEBUG_PRINT(("sequence_insert(): data=%s depth=%lu prev_seq:%s\n",
         data, depth, (prev_seq) ? "yes" : "no"));
@@ -324,23 +329,15 @@ void dump_sequence(struct mesh *f)
     printf("Total contexts:%lu\n", f->ctxs_len-1);
 }
 
-struct dt_stat {
-    char *data;
-    struct data *data_ptr;
-    size_t count;
-    double percent;
-};
-
-void _datatree_stats(struct data *cur, struct dt_stat **stats, size_t *stats_n)
+void _datatree_stats(struct data *cur, struct datatree_stat **stats, size_t *stats_n)
 {
     assert(cur);
     size_t n = *stats_n;
     size_t i = 0;
     *stats_n = n+1;
     stats[n] = safe_malloc(sizeof(**stats), __LINE__);
-    stats[n]->data = cur->data;
-    stats[n]->count = 0;
     stats[n]->data_ptr = cur;
+    stats[n]->count = 0;
     for(i = 0; i < cur->seqs_len; i++) {
         stats[n]->count += cur->sub_seqs_len[i];
     }
@@ -354,8 +351,8 @@ void _datatree_stats(struct data *cur, struct dt_stat **stats, size_t *stats_n)
 
 int datatree_sort_cmp(const void *p1, const void *p2)
 {
-    struct dt_stat *d1 = *(struct dt_stat **)p1;
-    struct dt_stat *d2 = *(struct dt_stat **)p2;
+    struct datatree_stat *d1 = *(struct datatree_stat **)p1;
+    struct datatree_stat *d2 = *(struct datatree_stat **)p2;
     if(d1->count < d2->count) {
         return -1;
     } else if(d1->count > d2->count) {
@@ -367,11 +364,14 @@ int datatree_sort_cmp(const void *p1, const void *p2)
 void datatree_stats(struct mesh *m, int print_top_bottom)
 {
     struct data *cur = m->dt->datas;
-    struct dt_stat **stats = safe_malloc(sizeof(*stats)*(m->dt->count), __LINE__); ////NULL;
+    struct datatree_stat **stats = safe_malloc(sizeof(*stats)*(m->dt->count), __LINE__);
     size_t stats_n = 0;
     size_t i = 0;
-    _datatree_stats(cur, stats, &stats_n);
-    qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
+    if(g_recalculate_datatree_stats) {
+        _datatree_stats(cur, stats, &stats_n);
+        qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
+    }
+    g_recalculate_datatree_stats = 0;
     for(i = 0; i < stats_n; i++) {
         stats[i]->percent = (double)stats[i]->count/(double)m->total_sequence_data_refs * 100.0;
         // add the stats to the datatree
@@ -381,11 +381,11 @@ void datatree_stats(struct mesh *m, int print_top_bottom)
     if(print_top_bottom > 0) {
         printf("---- top ----\n");
         for(i = stats_n-1; i > stats_n-125; i--) {
-            printf("DATATREE_STATS: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+            printf("DATATREE_STATS: %s -> %lu   [%.6f%%]\n", stats[i]->data_ptr->data, stats[i]->count, stats[i]->percent);
         }
         printf("---- bottom ----\n");
         for(i = 0; i < 25; i++) {
-            printf("DATATREE_STATS: %s -> %lu   [%.6f%%]\n", stats[i]->data, stats[i]->count, stats[i]->percent);
+            printf("DATATREE_STATS: %s -> %lu   [%.6f%%]\n", stats[i]->data_ptr->data, stats[i]->count, stats[i]->percent);
         }
     }
 }

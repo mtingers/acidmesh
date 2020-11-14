@@ -1,7 +1,13 @@
 //
 // Notes:
 // https://docs.python.org/3/c-api/arg.html
+// Some example code to reference:
+// ftp://ftp.netapp.com/frm-ntap/opensource/ClusterViewer/1.0/package_sources/Python-3.4.4/Python/import.c
+// https://stackoverflow.com/questions/3253563/pass-list-as-argument-to-python-c-module
 //
+// TODO: Figure out the python INCREF/DECREF stuff
+//
+
 #include <Python.h>
 #include <time.h>
 #include "util.h"
@@ -14,6 +20,14 @@ static size_t g_meshs_len = 0;
 static struct mesh **g_meshs = NULL;
 static const size_t MAX_DEPTH = 0;
 
+static int check_mesh_index(size_t i)
+{
+    if(i >= g_meshs_len) {
+        PyErr_SetString(PyExc_KeyError, "Invalid mesh index");
+        return 0;
+    }
+    return 1;
+}
 
 size_t size_t_rand_range(size_t lower, size_t upper)
 {
@@ -28,7 +42,7 @@ static PyObject *pym_datatree_stats(PyObject *self, PyObject *args)
         return NULL;
     }
     if(i >= g_meshs_len) {
-        PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
+        PyErr_SetString(PyExc_ValueError, "Invalid mesh index");
         return NULL;
     }
     datatree_stats(g_meshs[i], print_top_bottom);
@@ -41,10 +55,7 @@ static PyObject *pym_dump(PyObject *self, PyObject *args)
     if(!PyArg_ParseTuple(args, "k", &i)) {
         return NULL;
     }
-    if(i >= g_meshs_len) {
-        PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
-        return NULL;
-    }
+    if(!check_mesh_index(i)) { return NULL; }
     dump_sequence(g_meshs[i]);
     Py_RETURN_NONE;
 }
@@ -55,10 +66,7 @@ static PyObject *pym_link_last_contexts(PyObject *self, PyObject *args)
     if(!PyArg_ParseTuple(args, "k", &i)) {
         return NULL;
     }
-    if(i >= g_meshs_len) {
-        PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
-        return NULL;
-    }
+    if(!check_mesh_index(i)) { return NULL; }
     link_last_contexts(g_meshs[i]);
     Py_RETURN_NONE;
 }
@@ -89,10 +97,7 @@ static PyObject *pym_sequence_insert(PyObject *self, PyObject *args)
     if(!PyArg_ParseTuple(args, "kskk", &i, &s, &slen, &index)) {
         return NULL;
     }
-    if(i >= g_meshs_len) {
-        PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
-        return NULL;
-    }
+    if(!check_mesh_index(i)) { return NULL; }
     f = g_meshs[i];
     sequence_insert(f, s, slen, index);
     Py_RETURN_NONE;
@@ -211,6 +216,102 @@ static PyObject *get_prevs_dict(struct sequence *s, size_t depth)
     return pseqs;
 }
 
+// Return input as output
+PyObject *pym_echo(PyObject *self, PyObject *args)
+{
+    size_t i = 0;
+    struct mesh *m = NULL;
+    PyObject *o = NULL;
+
+    if(!PyArg_ParseTuple(args, "kO", &i, &o)) {
+        return NULL;
+    }
+    Py_INCREF(o);
+    if(!check_mesh_index(i)) { return NULL; }
+    m = g_meshs[i];
+    return o; 
+}
+
+/*
+Take variable input and generate a response.
+    Example: How are you?
+        -> I am good.
+
+Ideas:
+    - Build a sorted list from low to high based from data->stats_percent
+    - Select contexts that match X% of the words in the sorted list
+    - -OR- in other words, that may not work and find contexts that match the
+      most (maybe with a threshold)
+    - The idea is to find a context that matches X% items on the lower
+      stats_percent of the inputs. Once contexts are found, sort them by
+      higehst match. Next,
+      pick a context (randomly?) and take the next_ctx value from it, with up
+      to N next_ctx value (can be random or specified how much you want to
+      generate). (next_ctx's contains sequences that can be printed/returned)
+
+    - Edge cases:
+        - all words are the same or similar rating
+        - a small number of words have a low percent rating (low stats_percent
+          usually inidicates it is not a language structure word for building
+          sentences).
+
+    - Other things: Maybe add a explore_factor% to select words outside of a
+      context sequence that have a same common ancestor (at the same depth?)
+
+ */
+
+PyObject *pym_generate_response(PyObject *self, PyObject *args)
+{
+    size_t i = 0;
+    struct mesh *m = NULL;
+    char * line;
+    int nlines;
+    int n = 0;
+    PyObject * list_obj = NULL;
+    PyObject * str_obj = NULL;
+    struct data *d = NULL;
+    struct datatree_stat **dstat = NULL;
+    size_t dstat_n = 0;
+    if(!PyArg_ParseTuple(args, "kO!", &i, &PyList_Type, &list_obj)) {
+        return NULL;
+    }
+    if(!check_mesh_index(i)) { return NULL; }
+    m = g_meshs[i];
+    datatree_stats(m, 0);
+    nlines = PyList_Size(list_obj);
+    dstat = safe_malloc(sizeof(*dstat)*(nlines), __LINE__);
+    for(n = 0; n < nlines; n++){
+        str_obj = PyList_GetItem(list_obj, n);
+        const char *p = Py_TYPE(str_obj)->tp_name;
+        if(p[0] != 's' || p[1] != 't' || p[2] != 'r' || p[3] != '\0') {
+            PyErr_SetString(PyExc_ValueError,
+                "Invalid list item (must be string)!");
+            return NULL;
+        }
+        PyObject *temp_bytes = PyUnicode_AsEncodedString(
+            str_obj, "UTF-8", "strict"
+        );
+        line = PyBytes_AS_STRING(temp_bytes);
+        d = data_find(m, line, strlen(line));
+        if(d) {
+            printf("D:%s %.6f\n", d->data, d->stats_percent);
+            dstat[dstat_n] = safe_malloc(sizeof(*dstat[dstat_n]), __LINE__);
+            dstat[dstat_n]->data_ptr = d;
+            dstat[dstat_n]->count = d->stats_count;
+            dstat[dstat_n]->percent = d->stats_percent;
+            dstat_n++;
+        }
+        //line = strdup(line);
+        //printf("item[%lu]: %s\n", i, line);
+    }
+    qsort(dstat, dstat_n, sizeof(*dstat), datatree_sort_cmp);
+    for(i = 0; i < dstat_n; i++) {
+        printf("stats: %s %lu %.6f\n", dstat[i]->data_ptr->data, dstat[i]->count, dstat[i]->percent);
+    }
+    // Got here, the matching words were found and ordered by stat_percent
+    Py_RETURN_NONE;
+}
+
 void pym_generate_internal(
         PyObject *return_list,
         struct mesh *m,
@@ -242,7 +343,9 @@ void pym_generate_internal(
             // exists in any of these seq->contexts
             // NOTE: a context has a list of sequences in order
             for(k = 0; k < seq->ctxs_len; k++) {
-                if(!seq->contexts[k]->prev_ctx || !seq->contexts[k]->next_ctx) { continue; } // skip ones with little data
+                if(!seq->contexts[k]->prev_ctx || !seq->contexts[k]->next_ctx) {
+                    continue;
+                }
                 for(l = 0; l < seq->contexts[k]->seqs_len; l++) {
                     if(bncmp(seq->contexts[k]->seqs[l]->data->data, s2,
                             seq->contexts[k]->seqs[l]->data->len, slen2) == 0) {
@@ -338,6 +441,7 @@ found_ctx:
         pym_generate_internal(return_list, m, s1, s2, slen1, slen2, used_ctxs, used_ctxs_n, max_used_ctxs);
     }
 }
+
 static PyObject *pym_generate(PyObject *self, PyObject *args)
 {
     size_t i = 0;
@@ -352,10 +456,7 @@ static PyObject *pym_generate(PyObject *self, PyObject *args)
     if(!PyArg_ParseTuple(args, "kskskk", &i, &s, &slen, &s2, &s2len, &max_used_ctxs)) {
         return NULL;
     }
-    if(i >= g_meshs_len) {
-        PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
-        return NULL;
-    }
+    if(!check_mesh_index(i)) { return NULL; }
     m = g_meshs[i];
 
     size_t *used_ctxs = safe_malloc(sizeof(*used_ctxs)*max_used_ctxs, __LINE__);
@@ -366,7 +467,6 @@ static PyObject *pym_generate(PyObject *self, PyObject *args)
     return return_list;
 }
 
-
 static PyObject *pym_data_find(PyObject *self, PyObject *args)
 {
     size_t i = 0, j = 0;
@@ -376,10 +476,7 @@ static PyObject *pym_data_find(PyObject *self, PyObject *args)
     if(!PyArg_ParseTuple(args, "ksk", &i, &s, &slen)) {
         return NULL;
     }
-    if(i >= g_meshs_len) {
-        PyErr_SetString(PyExc_ValueError, "ERROR: Invalid mesh index");
-        return NULL;
-    }
+    if(!check_mesh_index(i)) { return NULL; }
     m = g_meshs[i];
     struct data *d = data_find(m, s, slen);
     if(!d) {
@@ -467,6 +564,7 @@ static PyObject *pym_mesh(PyObject *self, PyObject *args)
 static PyMethodDef acidmesh_methods[] = {
     {"acidmesh_test", pym_acidmesh, METH_VARARGS, "The AcidMesh Python module."},
     {"generate", pym_generate, METH_VARARGS, "Generate sentences from basic input keywords."},
+    {"generate_response", pym_generate_response, METH_VARARGS, "Create a new generate_response."},
     {"mesh", pym_mesh, METH_VARARGS, "Create a new mesh."},
     {"datatree_stats", pym_datatree_stats, METH_VARARGS, "Print stats on data word counts."},
     {"mesh_del", pym_mesh_del, METH_VARARGS, "Delete a mesh."},

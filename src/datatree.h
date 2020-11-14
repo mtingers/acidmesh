@@ -22,6 +22,12 @@ struct datatree {
     struct data *datas;
 };
 
+struct datatree_stat {
+    struct data *data_ptr;
+    size_t count;
+    double percent;
+};
+
 struct data *data_init(const char *data, size_t len);
 struct datatree *datatree_init(void);
 struct data *data_insert(struct mesh *f, const char *data, size_t len);
