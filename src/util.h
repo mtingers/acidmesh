@@ -34,6 +34,6 @@ void safe_free(void *p, int lineno);
 void newline2space(char *s, size_t s_len);
 int bncmp(const char *s1, const char *s2, size_t s1_n, size_t s2_n);
 Tree *tree_init(void);
-Tree *tree_insert(Tree *t, const void *p, size_t plen, int (*compar)(const void *, const void *, size_t));
-Tree *tree_find(Tree *t, const void *p, size_t plen, int (*compar)(const void *, const void *, size_t));
+Tree *tree_insert(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, size_t, size_t));
+Tree *tree_find(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, size_t, size_t));
 #endif

@@ -284,9 +284,32 @@ int tracker_sort_cmp(const void *p1, const void *p2)
     }
     return 0;
 }
+int ctx_stats_cmp_old(const void *p1, const void *p2, size_t n1, size_t n2)
+{
+    size_t s1 = *(size_t *)p1;
+    size_t s2 = *(size_t *)p2;
+    if(s1 > s2) {
+        return -1;
+    } else if(s1 < s2) {
+        return 1;
+    }
+    return 0;
+}
+int ctx_stats_cmp(void *p1, void *p2, size_t n1, size_t n2)
+{
+    size_t s1 = *(size_t *)p1;
+    size_t s2 = *(size_t *)p2;
+    if(s1 > s2) {
+        return -1;
+    } else if(s1 < s2) {
+        return 1;
+    }
+    return 0;
+}
 
 PyObject *pym_generate_response(PyObject *self, PyObject *args)
 {
+    // TODO: Break up into functions and track malloc/free
     size_t i = 0, j = 0, k = 0, l = 0, n = 0, o = 0, p = 0;
     struct mesh *m = NULL;
     char * line;
@@ -321,7 +344,7 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
         d = data_find(m, line, strlen(line));
         //if(d) { // && d->stats_percent < 1.0) {
         if(d) { // && d->stats_percent < 0.5) {
-            printf("D:%s %.6f\n", d->data, d->stats_percent);
+            //printf("D:%s %.6f\n", d->data, d->stats_percent);
             dts = safe_malloc(sizeof(*dts), __LINE__);
             dts->data_ptr = d;
             dts->count = d->stats_count;
@@ -333,9 +356,6 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
         line = NULL;
     }
     qsort(dstat, dstat_n, sizeof(*dstat), datatree_sort_cmp);
-    for(i = 0; i < dstat_n; i++) {
-        printf("stats: %s %lu %.6f\n", dstat[i]->data_ptr->data, dstat[i]->count, dstat[i]->percent);
-    }
     // Got here, the matching words were found and ordered by stat_percent
     // Now let's look at all of the contexts and rate them by count of matching
     // words
@@ -347,46 +367,73 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
     size_t count = 0;
     double hits = 0.0;
     struct context *ctx = NULL;
+    Tree *ctx_stats = NULL;
 
     d = NULL;
+    // This is essentially rating a context by how many matches the words have
+    // within it (then gives it a rating).
+    //
     // seqs[depth][index]
+    // lookup all data's associated sequence's context's sequence's
     for(i = 0; i < dstat_n; i++) {
         d = dstat[i]->data_ptr;
         count = dstat[i]->count;
         percent = dstat[i]->percent;
         for(j = 0; j < d->seqs_len; j++) {
-            if(d->sub_seqs_len[j] > 500 && size_t_rand_range(0, 4) != 2) {
-                printf("SKIP: %lu\n", d->sub_seqs_len[j]);
-                continue;
-            }
+            if(!d->seqs[j]) { continue; }
+            // This is where it breaks down on lookup since k can be huge for
+            // common words. Does not scale. How to fix?
             for(k = 0; k < d->sub_seqs_len[j]; k++) {
-                if(percent > 0.3) {
-                    if(k % 100 != 0) {
-                        continue;
-                    }
-                }
-                // Limit this layer, lots of associated sequences here
-                //if(d->sub_seqs_len[j] > 300 && k > 300) { break; }
-                if(!d->seqs[j]) { continue; }
                 if(!d->seqs[j][k]) { continue; }
                 seq = d->seqs[j][k];
+                // track by context and skip if already calculated.
+                // I think this makes sense?
+                if(!ctx_stats) {
+                    ctx_stats = tree_init();
+                    ctx_stats->p = d->seqs[j][k];
+                } else {
+                    if(tree_find(ctx_stats, d->seqs[j][k], 8, ctx_stats_cmp) > 0) {
+                        continue;
+                    }
+                    //printf("_new_: %p\n", d->seqs[j][k]);
+                    tree_insert(ctx_stats, d->seqs[j][k], 8, ctx_stats_cmp);
+                }
+                // This might actually be the slow part...?
                 for(l = 0; l < seq->ctxs_len; l++) {
                     ctx = seq->contexts[l];
                     hits = 0.0;
+                    // this is slow here:
                     // all of the sequences in this context
+                    int missed_words = 0;
                     for(o = 0; o < ctx->seqs_len; o++) {
                         sub_seq = ctx->seqs[o];
+                        // hmm this is the slow part?
+                        int found = 0;
                         for(p = 0; p < dstat_n; p++) {
                             if(p == i) { continue; }
-                            if(sub_seq->data->len != dstat[p]->data_ptr->len) { continue; }
+                            //hits -= 1.0;
+                            if(sub_seq->data->len != dstat[p]->data_ptr->len) {
+                                missed_words++;
+                                continue;
+                            }
                             if(bncmp(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len) == 0) {
-                                hits += 1.0 + (0.0-dstat[p]->percent);
+                                //hits += 1.0; // + (0.0-dstat[p]->percent);
+                                hits += 1.0 + (10.0-dstat[p]->percent); // + (0.0-dstat[p]->percent);
+                                if(sub_seq->depth == i) {
+                                    hits += 1.5; //hits; //0.5; // how much is this worth?
+                                }
+                                found = 1;
+                            } else {
+                                //hits += -dstat[p]->percent; //missed_words++;
                             }
                         }
+                        if(found < 1) {
+                            hits -= 10.0-sub_seq->data->stats_percent;
+                        }
                     }
-                    //[0][0][1723][4096]
-                    //printf("[%lu][%lu][%lu][%lu]\n", i, j, k, l);
-                    hits -= dabs((double)dstat_n - (double)ctx->seqs_len);
+                    //hits -= missed_words;
+                    double d = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
+                    hits =  hits - d;
                     track = safe_malloc(sizeof(*track), __LINE__);
                     track->i = i;
                     track->j = j;
@@ -405,176 +452,119 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
             }
         }
     }
+
     qsort(tracks, tracks_n, sizeof(*tracks), tracker_sort_cmp);
-    if(tracks_n > 25) {
-        j = 25;
+
+    PyObject *return_list = PyList_New(0);
+    Py_INCREF(return_list);
+    char *buffer = NULL;
+    size_t buffer_size = 0, buffer_pos = 0;
+    size_t *seen = safe_malloc(sizeof(*seen)*tracks_n*2, __LINE__);
+    size_t seen_pos = 0;
+    int is_seen = 0;
+    double min_rating = 0.0;
+    if(tracks[0]->hits < 0.0) {
+        min_rating = 2 * (tracks[0]->hits / 2.0 + tracks[0]->hits);
     } else {
-        j = tracks_n;
+        min_rating = 2 * (tracks[0]->hits  / 2.0 - tracks[0]->hits);
     }
-    for(i = 0; i < j; i++) {
+    for(i = 0; i < tracks_n; i++) {
         struct tracker *t = tracks[i];
-        printf("track: [%lu][%lu][%lu][%lu] -> %.2f\n", t->i, t->j, t->k, t->l, t->hits);
+        if(t->hits < min_rating) {
+            break;
+        }
+        //printf("track: [%lu][%lu][%lu][%lu] -> %.2f\n", t->i, t->j, t->k, t->l, t->hits);
         d = dstat[t->i]->data_ptr;
         ctx = d->seqs[t->j][t->k]->contexts[t->l];
-        if(i < 100) {
-            printf("    -> [%lu]: ", ctx->context_id);
-            for(o = 0; o < ctx->seqs_len; o++) {
-                printf("%s ", ctx->seqs[o]->data->data);
-            }
-            printf("\n\n");
-        }
-    }
-    printf("LEN:%lu\n", tracks_n);
-    printf("dabs: %.2f\n", dabs(1-2));
-    for(i = 0; i < dstat_n; i++)
-        safe_free(dstat[i], __LINE__);
-    safe_free(dstat, __LINE__);
-    Py_RETURN_NONE;
-
-error_cleanup:
-    for(i = 0; i < dstat_n; i++)
-        safe_free(dstat[i], __LINE__);
-    safe_free(dstat, __LINE__);
-    return NULL;
-}
-
-PyObject *pym_generate_response2(PyObject *self, PyObject *args)
-{
-    size_t i = 0, j = 0, k = 0, l = 0, n = 0, o = 0, p = 0;
-    struct mesh *m = NULL;
-    char * line;
-    int nlines;
-    PyObject * list_obj = NULL;
-    PyObject * str_obj = NULL;
-    struct data *d = NULL;
-    struct datatree_stat **dstat = NULL;
-    size_t dstat_n = 0;
-    struct datatree_stat *dts = NULL;
-    if(!PyArg_ParseTuple(args, "kO!", &i, &PyList_Type, &list_obj)) {
-        return NULL;
-    }
-    if(!check_mesh_index(i)) { return NULL; }
-    m = g_meshs[i];
-    datatree_stats(m, 0);
-    nlines = PyList_Size(list_obj);
-    dstat = safe_malloc(sizeof(*dstat)*(nlines+1), __LINE__);
-    for(n = 0; n < (size_t)nlines; n++){
-        str_obj = PyList_GetItem(list_obj, n);
-        const char *p = Py_TYPE(str_obj)->tp_name;
-        if(p[0] != 's' || p[1] != 't' || p[2] != 'r' || p[3] != '\0') {
-            PyErr_SetString(PyExc_ValueError,
-                "Invalid list item (must be string)!");
-            goto error_cleanup;
-        }
-        PyObject *temp_bytes = PyUnicode_AsEncodedString(
-            str_obj, "UTF-8", "strict"
-        );
-        line = PyBytes_AS_STRING(temp_bytes);
-        line = strdup(line);
-        d = data_find(m, line, strlen(line));
-        if(d) { // && d->stats_percent < 1.0) {
-            printf("D:%s %.6f\n", d->data, d->stats_percent);
-            dts = safe_malloc(sizeof(*dts), __LINE__);
-            dts->data_ptr = d;
-            dts->count = d->stats_count;
-            dts->percent = d->stats_percent;
-            dstat[dstat_n] = dts;
-            dstat_n++;
-        }
-        free(line);
-        line = NULL;
-    }
-    qsort(dstat, dstat_n, sizeof(*dstat), datatree_sort_cmp);
-    for(i = 0; i < dstat_n; i++) {
-        printf("stats: %s %lu %.6f\n", dstat[i]->data_ptr->data, dstat[i]->count, dstat[i]->percent);
-    }
-    // Got here, the matching words were found and ordered by stat_percent
-    // Now let's look at all of the contexts and rate them by count of matching
-    // words
-    struct tracker *track = NULL;
-    struct tracker **tracks = NULL; //safe_malloc(sizeof(*tracks), __LINE__);
-    size_t tracks_n = 0;
-    struct sequence *seq = NULL, *sub_seq = NULL;
-    double percent = 0.0;
-    size_t count = 0;
-    double hits = 0.0;
-    struct context *ctx = NULL;
-
-    d = NULL;
-    // seqs[depth][index]
-    for(i = 0; i < dstat_n; i++) {
-        d = dstat[i]->data_ptr;
-        count = dstat[i]->count;
-        percent = dstat[i]->percent;
-        if(d->seqs_len < i) {
-            printf("Too deeeeeeep...\n");
-            continue;
-        }
-        for(k = 0; k < d->sub_seqs_len[j]; k++) {
-            // Limit this layer, lots of associated sequences here
-            //if(d->sub_seqs_len[j] > 300 && k > 300) { break; }
-            if(!d->seqs[i]) { continue; }
-            if(!d->seqs[i][k]) { continue; }
-            seq = d->seqs[i][k];
-            for(l = 0; l < seq->ctxs_len; l++) {
-                ctx = seq->contexts[l];
-                hits = 0.0;
-                // all of the sequences in this context
-                for(o = 0; o < ctx->seqs_len; o++) {
-                    sub_seq = ctx->seqs[o];
-                    for(p = 0; p < dstat_n; p++) {
-                        if(p == i) { continue; }
-                        if(sub_seq->data->len != dstat[p]->data_ptr->len) { continue; }
-                        if(bncmp(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len) == 0) {
-                            hits += 1.0 + (0.0-dstat[p]->percent);
-                        }
-                    }
+        is_seen = 0;
+        if(ctx->next_ctx) {
+            for(j = 0; j < seen_pos; j++) {
+                if(seen[j] == ctx->next_ctx->context_id) {
+                    is_seen = 1;
+                    break;
                 }
-                //[0][0][1723][4096]
-                //printf("[%lu][%lu][%lu][%lu]\n", i, j, k, l);
-                hits -= dabs((double)dstat_n - (double)ctx->seqs_len);
-                track = safe_malloc(sizeof(*track), __LINE__);
-                track->i = i;
-                track->j = i;
-                track->k = k;
-                track->l = l;
-                track->context_id = ctx->context_id;
-                track->hits = hits;
-                if(tracks) {
-                    tracks = safe_realloc(tracks, sizeof(*tracks)*(tracks_n+1), __LINE__);
-                } else {
-                    tracks = safe_malloc(sizeof(*tracks), __LINE__);
+            }
+        }
+        if(ctx->next_ctx && is_seen < 1) {
+            seen[seen_pos] = ctx->next_ctx->context_id;
+            seen_pos++;
+            buffer_size = 0;
+            for(o = 0; o < ctx->next_ctx->seqs_len; o++) {
+                buffer_size += ctx->next_ctx->seqs[o]->data->len + 1;
+                //printf("%s ", ctx->next_ctx->seqs[o]->data->data);
+            }
+            buffer_size++;
+            buffer = safe_malloc(sizeof(*buffer)*(buffer_size+1), __LINE__);
+            buffer_size = 0;
+            k = 0;
+            buffer_pos = 0;
+            for(o = 0; o < ctx->next_ctx->seqs_len; o++) {
+                for(k = 0; k < ctx->next_ctx->seqs[o]->data->len; k++) {
+                    if(ctx->next_ctx->seqs[o]->data->data[k] == '\0') { break; }
+                    buffer[buffer_pos] = ctx->next_ctx->seqs[o]->data->data[k];
+                    buffer_pos++;
                 }
-                tracks[tracks_n] = track;
-                tracks_n++;
+                buffer[buffer_pos] = ' ';
+                buffer_pos++;
+            }
+            buffer[buffer_pos] = '\0';
+            PyObject *strs = Py_BuildValue("{s:s, s:d}",
+                "data", buffer,
+                "rating", t->hits
+            );
+            PyList_Append(return_list, strs);
+            safe_free(buffer, __LINE__);
+        }
+        is_seen = 0;
+        if(ctx->prev_ctx) {
+            for(j = 0; j < seen_pos; j++) {
+                if(seen[j] == ctx->prev_ctx->context_id) {
+                    is_seen = 1;
+                    break;
+                }
             }
         }
-    }
-    qsort(tracks, tracks_n, sizeof(*tracks), tracker_sort_cmp);
-    if(tracks_n > 25) {
-        j = 25;
-    } else {
-        j = tracks_n;
-    }
-    for(i = 0; i < j; i++) {
-        struct tracker *t = tracks[i];
-        printf("track: [%lu][%lu][%lu][%lu] -> %.2f\n", t->i, t->j, t->k, t->l, t->hits);
-        d = dstat[t->i]->data_ptr;
-        ctx = d->seqs[t->j][t->k]->contexts[t->l];
-        if(i < 100) {
-            printf("    -> [%lu]: ", ctx->context_id);
-            for(o = 0; o < ctx->seqs_len; o++) {
-                printf("%s ", ctx->seqs[o]->data->data);
+        if(!ctx->next_ctx && ctx->prev_ctx && is_seen < 1) {
+            seen[seen_pos] = ctx->next_ctx->context_id;
+            seen_pos++;
+            buffer_size = 0;
+            for(o = 0; o < ctx->prev_ctx->seqs_len; o++) {
+                buffer_size += ctx->prev_ctx->seqs[o]->data->len + 1;
+                //printf("%s ", ctx->prev_ctx->seqs[o]->data->data);
             }
-            printf("\n\n");
+            buffer_size++;
+            buffer = safe_malloc(sizeof(*buffer)*(buffer_size+1), __LINE__);
+            buffer_size = 0;
+            k = 0;
+            buffer_pos = 0;
+            for(o = 0; o < ctx->prev_ctx->seqs_len; o++) {
+                for(k = 0; k < ctx->prev_ctx->seqs[o]->data->len; k++) {
+                    if(ctx->prev_ctx->seqs[o]->data->data[k] == '\0') { break; }
+                    buffer[buffer_pos] = ctx->prev_ctx->seqs[o]->data->data[k];
+                    buffer_pos++;
+                }
+                buffer[buffer_pos] = ' ';
+                buffer_pos++;
+            }
+            buffer[buffer_pos] = '\0';
+            PyObject *strs = Py_BuildValue("{s:s, s:d}",
+                "data", buffer,
+                "rating", t->hits
+            );
+            PyList_Append(return_list, strs);
+            safe_free(buffer, __LINE__);
         }
     }
-    printf("LEN:%lu\n", tracks_n);
-    printf("dabs: %.2f\n", dabs(1-2));
+
+    // OK, whew, now lets take the top one and use the next context and print
+    // it as a response. if next doesn't exist, use the previous. if prev
+    // doesn't exist, then try the next item in the tracker;
+    safe_free(seen, __LINE__);
     for(i = 0; i < dstat_n; i++)
         safe_free(dstat[i], __LINE__);
     safe_free(dstat, __LINE__);
-    Py_RETURN_NONE;
+    return return_list;
+    //Py_RETURN_NONE;
 
 error_cleanup:
     for(i = 0; i < dstat_n; i++)
