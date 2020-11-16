@@ -259,10 +259,20 @@ Ideas:
 
     - Other things: Maybe add a explore_factor% to select words outside of a
       context sequence that have a same common ancestor (at the same depth?)
+      or within a range of depth
 
  */
 struct tracker {
-    size_t i, j, k, l, o, p;
+    // TODO: relabel these so they are undsertandable
+    // t->l = t->ctx_idx;
+    // t->k = t->seq_idx;
+    // t->j = t->depth;
+    // t->i = t->dstat_idx;
+    //size_t i, j, k, l, o, p;
+    size_t dstat_idx;
+    size_t depth;
+    size_t seq_idx;
+    size_t ctx_idx;
     size_t context_id;
     double hits;
 };
@@ -368,32 +378,34 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
     Tree *ctx_stats = NULL;
     struct data *d = NULL;
     double da = 0.0;
-    size_t i = 0, j = 0, k = 0, l = 0, o = 0, p = 0;
+    size_t dstat_idx = 0, depth = 0, seq_idx = 0, ctx_idx = 0;
+    size_t o = 0, p = 0;
     // This is essentially rating a context by how many matches the words have
     // within it (then gives it a rating).
     //
     // seqs[depth][index]
     // lookup all data's associated sequence's context's sequence's
-    for(i = 0; i < dstat_n; i++) {
-        d = dstat[i]->data_ptr;
-        count = dstat[i]->count;
-        percent = dstat[i]->percent;
-        for(j = 0; j < d->seqs_len; j++) {
-            if(!d->seqs[j]) { continue; }
-            for(k = 0; k < d->sub_seqs_len[j]; k++) {
-                if(!d->seqs[j][k]) { continue; }
-                seq = d->seqs[j][k];
+    for(dstat_idx = 0; dstat_idx < dstat_n; dstat_idx++) {
+        d = dstat[dstat_idx]->data_ptr;
+        count = dstat[dstat_idx]->count;
+        percent = dstat[dstat_idx]->percent;
+        for(depth = 0; depth < d->seqs_len; depth++) {
+            if(!d->seqs[depth]) { continue; }
+            for(seq_idx = 0; seq_idx < d->sub_seqs_len[depth]; seq_idx++) {
+                if(!d->seqs[depth][seq_idx]) { continue; }
+                seq = d->seqs[depth][seq_idx];
                 if(!ctx_stats) {
                     ctx_stats = tree_init();
-                    ctx_stats->p = d->seqs[j][k];
+                    ctx_stats->p = d->seqs[depth][seq_idx];
                 } else {
-                    if(tree_find(ctx_stats, d->seqs[j][k], 8, ctx_stats_cmp) > 0) {
+                    if(tree_find(ctx_stats, d->seqs[depth][seq_idx], 8, ctx_stats_cmp) > 0) {
                         continue;
                     }
-                    tree_insert(ctx_stats, d->seqs[j][k], 8, ctx_stats_cmp);
+                    tree_insert(ctx_stats, d->seqs[depth][seq_idx], 8, ctx_stats_cmp);
                 }
-                for(l = 0; l < seq->ctxs_len; l++) {
-                    ctx = seq->contexts[l];
+                //for(ctx_idx = 0; ctx_idx < seq->ctxs_ctx_idxen; ctx_idx++) {
+                for(ctx_idx = 0; ctx_idx < seq->ctxs_len; ctx_idx++) {
+                    ctx = seq->contexts[ctx_idx];
                     hits = 0.0;
                     // all of the sequences in this context
                     int missed_words = 0;
@@ -401,7 +413,7 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
                         sub_seq = ctx->seqs[o];
                         int found = 0;
                         for(p = 0; p < dstat_n; p++) {
-                            if(p == i) { continue; }
+                            if(p == dstat_idx) { continue; }
                             //hits -= 1.0;
                             if(sub_seq->data->len != dstat[p]->data_ptr->len) {
                                 missed_words++;
@@ -410,7 +422,7 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
                             if(bncmp(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len) == 0) {
                                 //hits += 1.0; // + (0.0-dstat[p]->percent);
                                 hits += 1.0 + (10.0-dstat[p]->percent); // + (0.0-dstat[p]->percent);
-                                if(sub_seq->depth == i) {
+                                if(sub_seq->depth == dstat_idx) {
                                     hits += 1.5; //hits; //0.5; // how much is this worth?
                                 }
                                 found = 1;
@@ -426,10 +438,10 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
                     da = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
                     hits =  hits - da;
                     track = safe_malloc(sizeof(*track), __LINE__);
-                    track->i = i;
-                    track->j = j;
-                    track->k = k;
-                    track->l = l;
+                    track->dstat_idx = dstat_idx;
+                    track->depth = depth;
+                    track->seq_idx = seq_idx;
+                    track->ctx_idx = ctx_idx;
                     track->context_id = ctx->context_id;
                     track->hits = hits;
                     if(tracks) {
@@ -478,7 +490,6 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
     m = g_meshs[i];
 
     if((dtw = stats_calc_sort(m, list_obj)) == NULL) {
-        printf("stats_calc_sort:failed\n");
         goto error_cleanup;
     }
     dstat = dtw->dstat;
@@ -506,14 +517,12 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
     }
     // Build the return value list::dict
     for(i = 0; i < tracks_n; i++) {
-        printf("t-i: %lu\n", i);
         struct tracker *t = tracks[i];
         if(t->hits < min_rating) {
             break;
         }
-        //printf("track: [%lu][%lu][%lu][%lu] -> %.2f\n", t->i, t->j, t->k, t->l, t->hits);
-        d = dstat[t->i]->data_ptr;
-        ctx = d->seqs[t->j][t->k]->contexts[t->l];
+        d = dstat[t->dstat_idx]->data_ptr;
+        ctx = d->seqs[t->depth][t->seq_idx]->contexts[t->ctx_idx];
         is_seen = 0;
         if(ctx->next_ctx) {
             for(j = 0; j < seen_pos; j++) {
@@ -547,7 +556,7 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
             buffer[buffer_pos] = '\0';
             PyObject *strs = Py_BuildValue("{s:s, s:d}",
                 "data", buffer,
-                "rating", t->hits
+                "rating", dround(t->hits, 4)
             );
             PyList_Append(return_list, strs);
             safe_free(buffer, __LINE__);
@@ -562,12 +571,11 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
             }
         }
         if(!ctx->next_ctx && ctx->prev_ctx && is_seen < 1) {
-            seen[seen_pos] = ctx->next_ctx->context_id;
+            seen[seen_pos] = ctx->prev_ctx->context_id;
             seen_pos++;
             buffer_size = 0;
             for(o = 0; o < ctx->prev_ctx->seqs_len; o++) {
                 buffer_size += ctx->prev_ctx->seqs[o]->data->len + 1;
-                //printf("%s ", ctx->prev_ctx->seqs[o]->data->data);
             }
             buffer_size++;
             buffer = safe_malloc(sizeof(*buffer)*(buffer_size+1), __LINE__);
@@ -586,7 +594,7 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
             buffer[buffer_pos] = '\0';
             PyObject *strs = Py_BuildValue("{s:s, s:d}",
                 "data", buffer,
-                "rating", t->hits
+                "rating", dround(t->hits, 4)
             );
             PyList_Append(return_list, strs);
             safe_free(buffer, __LINE__);

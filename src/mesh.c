@@ -29,7 +29,9 @@ struct mesh *mesh_init(void)
 
 void link_last_contexts(struct mesh *f)
 {
+    //printf("link: f->ctxs_len: %lu\n", f->ctxs_len);
     if(f->ctxs_len > 1) {
+        //printf("    do_link: %lu <-> %lu\n", f->ctxs_len-2, f->ctxs_len-1);
         f->ctxs[f->ctxs_len-2]->next_ctx = f->ctxs[f->ctxs_len-1];
         f->ctxs[f->ctxs_len-1]->prev_ctx = f->ctxs[f->ctxs_len-2];
     }

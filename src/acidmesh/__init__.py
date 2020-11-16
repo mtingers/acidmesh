@@ -31,4 +31,6 @@ class Mesh:
         cwm.datatree_stats(self.mesh_id, print_top_bottom)
 
     def generate_response(self, x):
-        return cwm.generate_response(self.mesh_id, [str(i) for i in x])
+        if type(x) != str:
+            return cwm.generate_response(self.mesh_id, [str(i) for i in x])
+        return cwm.generate_response(self.mesh_id, x.split(' '))

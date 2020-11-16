@@ -4,6 +4,16 @@
 #include <string.h>
 #include "util.h"
 
+double dround(double val, int dp)
+{
+    int charsNeeded = 1 + snprintf(NULL, 0, "%.*f", dp, val);
+    char *buffer = malloc(charsNeeded);
+    snprintf(buffer, charsNeeded, "%.*f", dp, val);
+    double result = atof(buffer);
+    free(buffer);
+    return result;
+}
+
 void *safe_realloc(void *ptr, size_t size, int lineno)
 {
     void *p = realloc(ptr, size);
@@ -137,8 +147,44 @@ Tree *tree_find(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, siz
     return NULL;
 }
 
+Tree *tree_insert_copy(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, size_t, size_t))
+{
+    // NOTE: This version malloc's and copies p based off of plen
+    Tree *cur = t;
+    int rc = 0;
+    while(cur) {
+        rc = compar(cur->p, p, cur->len, plen);
+        if(rc < 0) {
+            if(!cur->left) {
+                cur->left = tree_init();
+                cur->left->len = plen;
+                cur->left->p = safe_malloc(plen, __LINE__);
+                memcpy(cur->left->p, p, plen);
+                return cur->left;
+            }
+            cur = cur->left;
+        } else if(rc > 0) {
+            if(!cur->right) {
+                cur->right = tree_init();
+                cur->right->len = plen;
+                cur->right->p = safe_malloc(plen, __LINE__);
+                memcpy(cur->right->p, p, plen);
+                return cur->right;
+            }
+            cur = cur->right;
+        } else {
+            // Found;
+            return cur;
+        }
+    }
+    fprintf(stderr, "ERROR: Programmer error in tree_insert()\n");
+    exit(1);
+}
+
 Tree *tree_insert(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, size_t, size_t))
 {
+    // NOTE: This version is only a pointer to p and plen is only added as len
+    // reference.
     Tree *cur = t;
     int rc = 0;
     while(cur) {
@@ -169,6 +215,20 @@ Tree *tree_insert(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, s
     fprintf(stderr, "ERROR: Programmer error in tree_insert()\n");
     exit(1);
 }
+
+void tree_free_copied(Tree *t)
+{
+    if(t->left) {
+        tree_free(t->left);
+    }
+    if(t->right) {
+        tree_free(t->right);
+    }
+    safe_free(t->p, __LINE__);
+    safe_free(t, __LINE__);
+}
+
+
 
 void tree_free(Tree *t)
 {
