@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include "util.h"
+#include "sequence.h"
 #include "mesh.h"
 #include "datatree.h"
 #include "container.h"
@@ -37,5 +38,4 @@ void dump_container(struct container *c, size_t depth, size_t indent)
         dump_container(c->right, depth, indent+1);
     }
 }
-
 

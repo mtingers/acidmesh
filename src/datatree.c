@@ -4,8 +4,26 @@
 #include <string.h>
 #include <assert.h>
 #include "util.h"
+#include "sequence.h"
 #include "datatree.h"
 #include "mesh.h"
+
+static int g_recalculate_datatree_stats = 1;
+
+void recalculate_datatree_stats_on(void)
+{
+    g_recalculate_datatree_stats = 1;
+}
+
+void recalculate_datatree_stats_off(void)
+{
+    g_recalculate_datatree_stats = 1;
+}
+
+int recalculate_datatree_stats_get(void)
+{
+    return g_recalculate_datatree_stats;
+}
 
 struct data *data_init(const char *data, size_t len)
 {
@@ -33,41 +51,10 @@ struct datatree *datatree_init()
     return dt;
 }
 
-// This is wrong because it overwrites by depth
-// should have been struct sequence *** not **
-//void data_add_sequence_old(struct data *w, struct sequence *s)
-//{
-//    size_t i = 0;
-//    if(s->depth+1 > w->seqs_len) {
-//        if(!w->seqs) {
-//            // no references exist at this depth, so allocate to this depth
-//            // then NULL out those that don't exist yet
-//            w->seqs = safe_malloc(sizeof(*w->seqs)*(s->depth+1), __LINE__);
-//            for(i = 0; i <= s->depth; i++) {
-//                w->seqs[i] = NULL;
-//            }
-//        } else {
-//            w->seqs = safe_realloc(w->seqs,
-//                sizeof(*w->seqs)*(s->depth+1), __LINE__);
-//            for(i = w->seqs_len; i <= s->depth; i++) {
-//                w->seqs[i] = NULL;
-//            }
-//        }
-//        w->seqs[s->depth] = s;
-//        w->seqs_len = s->depth+1;
-//    } else {
-//        // this depth exists, so we must check if it's NULL and add if so
-//        if(!w->seqs[s->depth]) {
-//            w->seqs[s->depth] = s;
-//        }
-//    }
-//}
-
 void data_add_sequence(struct mesh *m, struct data *w, struct sequence *s)
 {
     size_t i = 0;
     m->total_sequence_data_refs++;
-    // ahhhhhhh!
     if(s->depth+1 > w->seqs_len) {
         if(!w->seqs) {
             // no references exist at this depth, so allocate to this depth
@@ -173,6 +160,66 @@ void dump_datas(struct data *w, size_t indent)
     }
     if(w->right) {
         dump_datas(w->right, indent+1);
+    }
+}
+
+void _datatree_stats(struct data *cur, struct datatree_stat **stats, size_t *stats_n)
+{
+    size_t n = *stats_n;
+    size_t i = 0;
+    assert(cur);
+    *stats_n = n+1;
+    stats[n] = safe_malloc(sizeof(**stats), __LINE__);
+    stats[n]->data_ptr = cur;
+    stats[n]->count = 0;
+    for(i = 0; i < cur->seqs_len; i++) {
+        stats[n]->count += cur->sub_seqs_len[i];
+    }
+    if(cur->left) {
+        _datatree_stats(cur->left, stats, stats_n);
+    }
+    if(cur->right) {
+        _datatree_stats(cur->right, stats, stats_n);
+    }
+}
+
+int datatree_sort_cmp(const void *p1, const void *p2)
+{
+    struct datatree_stat *d1 = *(struct datatree_stat **)p1;
+    struct datatree_stat *d2 = *(struct datatree_stat **)p2;
+    if(d1->count < d2->count) {
+        return -1;
+    } else if(d1->count > d2->count) {
+        return 1;
+    }
+    return 0;
+}
+
+void datatree_stats(struct mesh *m, int print_top_bottom)
+{
+    struct data *cur = m->dt->datas;
+    struct datatree_stat **stats = safe_malloc(sizeof(*stats)*(m->dt->count), __LINE__);
+    size_t stats_n = 0;
+    size_t i = 0;
+    if(g_recalculate_datatree_stats) {
+        _datatree_stats(cur, stats, &stats_n);
+        qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
+    }
+    g_recalculate_datatree_stats = 0;
+    for(i = 0; i < stats_n; i++) {
+        stats[i]->percent = (double)stats[i]->count/(double)m->total_sequence_data_refs * 100.0;
+        stats[i]->data_ptr->stats_percent = stats[i]->percent;
+        stats[i]->data_ptr->stats_count = stats[i]->count;
+    }
+    if(print_top_bottom > 0) {
+        printf("---- top ----\n");
+        for(i = stats_n-1; i > stats_n-125; i--) {
+            printf("> %s -> %lu   [%.6f%%]\n", stats[i]->data_ptr->data, stats[i]->count, stats[i]->percent);
+        }
+        printf("---- bottom ----\n");
+        for(i = 0; i < 25; i++) {
+            printf("> %s -> %lu   [%.6f%%]\n", stats[i]->data_ptr->data, stats[i]->count, stats[i]->percent);
+        }
     }
 }
 

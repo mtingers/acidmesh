@@ -170,4 +170,15 @@ Tree *tree_insert(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, s
     exit(1);
 }
 
+void tree_free(Tree *t)
+{
+    if(t->left) {
+        tree_free(t->left);
+    }
+    if(t->right) {
+        tree_free(t->right);
+    }
+    safe_free(t, __LINE__);
+}
+
 

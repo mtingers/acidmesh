@@ -1,4 +1,5 @@
 from distutils.core import setup, Extension
+# export ARCHFLAGS="-arch x86_64
 
 def main():
     setup(
@@ -23,7 +24,7 @@ def main():
         ],
         ext_modules=[
             Extension('cacidmesh',
-                sources=['pyacidmesh.c', 'container.c', 'context.c', 'mesh.c', 'util.c', 'datatree.c'],
+                sources=['pyacidmesh.c', 'sequence.c', 'container.c', 'context.c', 'mesh.c', 'util.c', 'datatree.c'],
             )
         ]
     )

@@ -4,6 +4,7 @@
 #include <string.h>
 #include "util.h"
 #include "mesh.h"
+#include "sequence.h"
 #include "datatree.h"
 #include "container.h"
 #include "context.h"

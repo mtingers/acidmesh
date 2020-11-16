@@ -1,17 +1,5 @@
-#ifndef FOREST_H
-#define FOREST_H 1
-
-struct sequence {
-    size_t depth;
-    struct container *parents;
-    struct data *data;
-    size_t prev_len;
-    size_t next_len;
-    struct sequence **nexts;
-    struct sequence **prevs;
-    size_t ctxs_len;
-    struct context **contexts;
-};
+#ifndef MESH_H
+#define MESH_H 1
 
 struct mesh {
     size_t container_len;
@@ -26,11 +14,6 @@ struct mesh {
 };
 
 struct mesh *mesh_init(void);
-void dump_sequence(struct mesh *f);
-void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t depth);
-struct sequence *sequence_init(struct data *w, size_t depth);
-void sequence_add_parent(struct sequence *t, struct sequence *parent);
 void link_last_contexts(struct mesh *f);
-void datatree_stats(struct mesh *m, int print_top_bottom);
-int datatree_sort_cmp(const void *p1, const void *p2);
+
 #endif

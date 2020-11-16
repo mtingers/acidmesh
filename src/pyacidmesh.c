@@ -12,6 +12,7 @@
 #include <time.h>
 #include "util.h"
 #include "mesh.h"
+#include "sequence.h"
 #include "datatree.h"
 #include "container.h"
 #include "context.h"
@@ -37,10 +38,12 @@ static int check_mesh_index(size_t i)
     return 1;
 }
 
-size_t size_t_rand_range(size_t lower, size_t upper)
+/*
+static size_t urand_range(size_t lower, size_t upper)
 {
     return (rand() % (upper - lower + 1)) + lower;
 }
+*/
 
 static PyObject *pym_datatree_stats(PyObject *self, PyObject *args)
 {
@@ -64,7 +67,7 @@ static PyObject *pym_dump(PyObject *self, PyObject *args)
         return NULL;
     }
     if(!check_mesh_index(i)) { return NULL; }
-    dump_sequence(g_meshs[i]);
+    sequence_dump(g_meshs[i]);
     Py_RETURN_NONE;
 }
 
@@ -114,26 +117,19 @@ static PyObject *pym_sequence_insert(PyObject *self, PyObject *args)
 static PyObject *get_nexts_dict(struct sequence *s, size_t depth);
 static PyObject *get_prevs_dict(struct sequence *s, size_t depth);
 
-static size_t g_counter = 0;
-
-size_t get_ancestors(PyObject *ancestors, struct container *parents, size_t index)
+static size_t get_ancestors(PyObject *ancestors, struct container *parents, size_t index)
 {
-    if(!parents || !parents->seq || !parents->seq->data) {
-        printf("E: !parents || !parents->seq)\n");
-        exit(1);
-    }
     struct container *cur = parents;
-    g_counter++;
     PyObject *val = Py_BuildValue("s", cur->seq->data->data);
     PyList_SetItem(ancestors, index, val);
-    index+=1;
+    index++;
     if(cur->left) {
         index = get_ancestors(ancestors, cur->left, index);
-        index+=1;
+        index++;
     }
     if(cur->right) {
         index = get_ancestors(ancestors, cur->right, index);
-        index+=1;
+        index++;
     }
     return index-1;
 }
@@ -169,7 +165,6 @@ static PyObject *get_nexts_dict(struct sequence *s, size_t depth)
                 "ancestors"
             );
         }
-        g_counter++;
         PyList_SetItem(pseqs, index, sdict);
         index++;
     }
@@ -217,7 +212,6 @@ static PyObject *get_prevs_dict(struct sequence *s, size_t depth)
             );
 
         }
-        g_counter++;
         PyList_SetItem(pseqs, index, sdict);
         index++;
     }
@@ -272,8 +266,12 @@ struct tracker {
     size_t context_id;
     double hits;
 };
+struct tracker_wrapper {
+    size_t n;
+    struct tracker **tracks;
+};
 
-int tracker_sort_cmp(const void *p1, const void *p2)
+static int tracker_sort_cmp(const void *p1, const void *p2)
 {
     struct tracker *d1 = *(struct tracker **)p1;
     struct tracker *d2 = *(struct tracker **)p2;
@@ -284,18 +282,7 @@ int tracker_sort_cmp(const void *p1, const void *p2)
     }
     return 0;
 }
-int ctx_stats_cmp_old(const void *p1, const void *p2, size_t n1, size_t n2)
-{
-    size_t s1 = *(size_t *)p1;
-    size_t s2 = *(size_t *)p2;
-    if(s1 > s2) {
-        return -1;
-    } else if(s1 < s2) {
-        return 1;
-    }
-    return 0;
-}
-int ctx_stats_cmp(void *p1, void *p2, size_t n1, size_t n2)
+static int ctx_stats_cmp(void *p1, void *p2, size_t n1, size_t n2)
 {
     size_t s1 = *(size_t *)p1;
     size_t s2 = *(size_t *)p2;
@@ -307,28 +294,30 @@ int ctx_stats_cmp(void *p1, void *p2, size_t n1, size_t n2)
     return 0;
 }
 
-PyObject *pym_generate_response(PyObject *self, PyObject *args)
+struct datatree_stat_wrapper {
+    size_t n;
+    struct datatree_stat **dstat;
+};
+
+static struct datatree_stat_wrapper *stats_calc_sort(struct mesh *m, PyObject *list_obj)
 {
-    // TODO: Break up into functions and track malloc/free
-    size_t i = 0, j = 0, k = 0, l = 0, n = 0, o = 0, p = 0;
-    struct mesh *m = NULL;
-    char * line;
-    int nlines;
-    PyObject * list_obj = NULL;
-    PyObject * str_obj = NULL;
+    struct datatree_stat_wrapper *dtw = safe_malloc(sizeof(*dtw), __LINE__);
+    size_t nlines = PyList_Size(list_obj);
+    struct datatree_stat **dstat = safe_malloc(
+        sizeof(*dstat)*(nlines+1), __LINE__
+    );
     struct data *d = NULL;
-    struct datatree_stat **dstat = NULL;
+    char * line;
     size_t dstat_n = 0;
-    struct datatree_stat *dts = NULL;
-    if(!PyArg_ParseTuple(args, "kO!", &i, &PyList_Type, &list_obj)) {
-        return NULL;
-    }
-    if(!check_mesh_index(i)) { return NULL; }
-    m = g_meshs[i];
-    datatree_stats(m, 0);
-    nlines = PyList_Size(list_obj);
-    dstat = safe_malloc(sizeof(*dstat)*(nlines+1), __LINE__);
-    for(n = 0; n < (size_t)nlines; n++){
+    size_t n = 0;
+    size_t i = 0;
+    PyObject * str_obj = NULL;
+
+    // Recalculate the mesh's internal datatree stats if needed
+    datatree_stats(m, False);
+
+    // Now lookup stats from input list and sort them
+    for(n = 0; n < nlines; n++) {
         str_obj = PyList_GetItem(list_obj, n);
         const char *p = Py_TYPE(str_obj)->tp_name;
         if(p[0] != 's' || p[1] != 't' || p[2] != 'r' || p[3] != '\0') {
@@ -342,25 +331,34 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
         line = PyBytes_AS_STRING(temp_bytes);
         line = strdup(line);
         d = data_find(m, line, strlen(line));
-        //if(d) { // && d->stats_percent < 1.0) {
-        if(d) { // && d->stats_percent < 0.5) {
-            //printf("D:%s %.6f\n", d->data, d->stats_percent);
-            dts = safe_malloc(sizeof(*dts), __LINE__);
-            dts->data_ptr = d;
-            dts->count = d->stats_count;
-            dts->percent = d->stats_percent;
-            dstat[dstat_n] = dts;
+        if(d) {
+            dstat[dstat_n] = safe_malloc(sizeof(**dstat), __LINE__);
+            dstat[dstat_n]->data_ptr = d;
+            dstat[dstat_n]->count = d->stats_count;
+            dstat[dstat_n]->percent = d->stats_percent;
             dstat_n++;
         }
-        free(line);
+        safe_free(line, __LINE__);
         line = NULL;
     }
     qsort(dstat, dstat_n, sizeof(*dstat), datatree_sort_cmp);
-    // Got here, the matching words were found and ordered by stat_percent
-    // Now let's look at all of the contexts and rate them by count of matching
-    // words
+    dtw->n = dstat_n;
+    dtw->dstat = dstat;
+    return dtw;
+
+error_cleanup:
+    safe_free(dtw, __LINE__);
+    for(i = 0; i < dstat_n; i++)
+        safe_free(dstat[i], __LINE__);
+    safe_free(dstat, __LINE__);
+    return NULL;
+}
+
+static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat, size_t dstat_n)
+{
+    struct tracker_wrapper *tw = safe_malloc(sizeof(*tw), __LINE__);
     struct tracker *track = NULL;
-    struct tracker **tracks = NULL; //safe_malloc(sizeof(*tracks), __LINE__);
+    struct tracker **tracks = NULL;
     size_t tracks_n = 0;
     struct sequence *seq = NULL, *sub_seq = NULL;
     double percent = 0.0;
@@ -368,8 +366,9 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
     double hits = 0.0;
     struct context *ctx = NULL;
     Tree *ctx_stats = NULL;
-
-    d = NULL;
+    struct data *d = NULL;
+    double da = 0.0;
+    size_t i = 0, j = 0, k = 0, l = 0, o = 0, p = 0;
     // This is essentially rating a context by how many matches the words have
     // within it (then gives it a rating).
     //
@@ -381,13 +380,9 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
         percent = dstat[i]->percent;
         for(j = 0; j < d->seqs_len; j++) {
             if(!d->seqs[j]) { continue; }
-            // This is where it breaks down on lookup since k can be huge for
-            // common words. Does not scale. How to fix?
             for(k = 0; k < d->sub_seqs_len[j]; k++) {
                 if(!d->seqs[j][k]) { continue; }
                 seq = d->seqs[j][k];
-                // track by context and skip if already calculated.
-                // I think this makes sense?
                 if(!ctx_stats) {
                     ctx_stats = tree_init();
                     ctx_stats->p = d->seqs[j][k];
@@ -395,19 +390,15 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
                     if(tree_find(ctx_stats, d->seqs[j][k], 8, ctx_stats_cmp) > 0) {
                         continue;
                     }
-                    //printf("_new_: %p\n", d->seqs[j][k]);
                     tree_insert(ctx_stats, d->seqs[j][k], 8, ctx_stats_cmp);
                 }
-                // This might actually be the slow part...?
                 for(l = 0; l < seq->ctxs_len; l++) {
                     ctx = seq->contexts[l];
                     hits = 0.0;
-                    // this is slow here:
                     // all of the sequences in this context
                     int missed_words = 0;
                     for(o = 0; o < ctx->seqs_len; o++) {
                         sub_seq = ctx->seqs[o];
-                        // hmm this is the slow part?
                         int found = 0;
                         for(p = 0; p < dstat_n; p++) {
                             if(p == i) { continue; }
@@ -432,8 +423,8 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
                         }
                     }
                     //hits -= missed_words;
-                    double d = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
-                    hits =  hits - d;
+                    da = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
+                    hits =  hits - da;
                     track = safe_malloc(sizeof(*track), __LINE__);
                     track->i = i;
                     track->j = j;
@@ -452,23 +443,70 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
             }
         }
     }
-
+    tree_free(ctx_stats);
     qsort(tracks, tracks_n, sizeof(*tracks), tracker_sort_cmp);
+    tw->tracks = tracks;
+    tw->n = tracks_n;
+    return tw;
+}
+
+static PyObject *pym_generate_response(PyObject *self, PyObject *args)
+{
+    int error = False;
+    size_t i = 0, j = 0, k = 0, o = 0;
+    struct mesh *m = NULL;
+    PyObject * list_obj = NULL;
+    struct data *d = NULL;
+    struct datatree_stat_wrapper *dtw = NULL;
+    struct datatree_stat **dstat = NULL;
+    size_t dstat_n = 0;
+    size_t *seen = NULL;
+    struct tracker_wrapper *tracks_wrap = NULL;
+    struct tracker **tracks = NULL;
+    size_t tracks_n = 0;
+    struct context *ctx = NULL;
+    char *buffer = NULL;
+    size_t buffer_size = 0, buffer_pos = 0;
+    size_t seen_pos = 0;
+    int is_seen = False;
+    double min_rating = 0.0;
+
+    if(!PyArg_ParseTuple(args, "kO!", &i, &PyList_Type, &list_obj)) {
+        return NULL;
+    }
+    if(!check_mesh_index(i)) { return NULL; }
+    m = g_meshs[i];
+
+    if((dtw = stats_calc_sort(m, list_obj)) == NULL) {
+        printf("stats_calc_sort:failed\n");
+        goto error_cleanup;
+    }
+    dstat = dtw->dstat;
+    dstat_n = dtw->n;
+    safe_free(dtw, __LINE__);
+
+    // Got here, the matching words were found and ordered by stat_percent
+    // Now let's look at all of the contexts and rate them by count of matching
+    // words and some other TBD calculations
+    // tracks
+    if((tracks_wrap = calc_context_scores(dstat, dstat_n)) == NULL) {
+        goto error_cleanup;
+    }
+    tracks = tracks_wrap->tracks;
+    tracks_n = tracks_wrap->n;
+    safe_free(tracks_wrap, __LINE__);
 
     PyObject *return_list = PyList_New(0);
     Py_INCREF(return_list);
-    char *buffer = NULL;
-    size_t buffer_size = 0, buffer_pos = 0;
-    size_t *seen = safe_malloc(sizeof(*seen)*tracks_n*2, __LINE__);
-    size_t seen_pos = 0;
-    int is_seen = 0;
-    double min_rating = 0.0;
+    seen = safe_malloc(sizeof(*seen)*tracks_n*2, __LINE__);
     if(tracks[0]->hits < 0.0) {
         min_rating = 2 * (tracks[0]->hits / 2.0 + tracks[0]->hits);
     } else {
         min_rating = 2 * (tracks[0]->hits  / 2.0 - tracks[0]->hits);
     }
+    // Build the return value list::dict
     for(i = 0; i < tracks_n; i++) {
+        printf("t-i: %lu\n", i);
         struct tracker *t = tracks[i];
         if(t->hits < min_rating) {
             break;
@@ -480,7 +518,7 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
         if(ctx->next_ctx) {
             for(j = 0; j < seen_pos; j++) {
                 if(seen[j] == ctx->next_ctx->context_id) {
-                    is_seen = 1;
+                    is_seen = True;
                     break;
                 }
             }
@@ -491,7 +529,6 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
             buffer_size = 0;
             for(o = 0; o < ctx->next_ctx->seqs_len; o++) {
                 buffer_size += ctx->next_ctx->seqs[o]->data->len + 1;
-                //printf("%s ", ctx->next_ctx->seqs[o]->data->data);
             }
             buffer_size++;
             buffer = safe_malloc(sizeof(*buffer)*(buffer_size+1), __LINE__);
@@ -519,7 +556,7 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
         if(ctx->prev_ctx) {
             for(j = 0; j < seen_pos; j++) {
                 if(seen[j] == ctx->prev_ctx->context_id) {
-                    is_seen = 1;
+                    is_seen = True;
                     break;
                 }
             }
@@ -555,25 +592,34 @@ PyObject *pym_generate_response(PyObject *self, PyObject *args)
             safe_free(buffer, __LINE__);
         }
     }
-
-    // OK, whew, now lets take the top one and use the next context and print
-    // it as a response. if next doesn't exist, use the previous. if prev
-    // doesn't exist, then try the next item in the tracker;
-    safe_free(seen, __LINE__);
-    for(i = 0; i < dstat_n; i++)
-        safe_free(dstat[i], __LINE__);
-    safe_free(dstat, __LINE__);
-    return return_list;
-    //Py_RETURN_NONE;
+    goto cleanup;
 
 error_cleanup:
-    for(i = 0; i < dstat_n; i++)
-        safe_free(dstat[i], __LINE__);
-    safe_free(dstat, __LINE__);
+    error = True;
+
+cleanup:
+    if(seen) { safe_free(seen, __LINE__); }
+    if(dstat) {
+        for(i = 0; i < dstat_n; i++)
+            safe_free(dstat[i], __LINE__);
+        safe_free(dstat, __LINE__);
+    }
+    if(tracks_n > 0) {
+        for(i = 0; i < tracks_n; i++)
+            safe_free(tracks[i], __LINE__);
+        safe_free(tracks, __LINE__);
+    }
+    if(error) {
+        goto error_cleanup_final;
+    }
+    return return_list;
+
+error_cleanup_final:
+    Py_DECREF(return_list);
     return NULL;
 }
 
-void pym_generate_internal(
+static void generate_internal(
         PyObject *return_list,
         struct mesh *m,
         const char *s1, const char *s2,
@@ -699,7 +745,7 @@ found_ctx:
         used_ctxs[used_ctxs_n+1] = ctx->context_id;
         used_ctxs[used_ctxs_n+2] = next_ctx->context_id;
         used_ctxs_n += 3;
-        pym_generate_internal(return_list, m, s1, s2, slen1, slen2, used_ctxs, used_ctxs_n, max_used_ctxs);
+        generate_internal(return_list, m, s1, s2, slen1, slen2, used_ctxs, used_ctxs_n, max_used_ctxs);
     }
 }
 
@@ -713,7 +759,6 @@ static PyObject *pym_generate(PyObject *self, PyObject *args)
     size_t used_ctxs_n = 0;
     size_t max_used_ctxs = 0;
 
-    //srand(time(0));
     if(!PyArg_ParseTuple(args, "kskskk", &i, &s, &slen, &s2, &s2len, &max_used_ctxs)) {
         return NULL;
     }
@@ -722,7 +767,7 @@ static PyObject *pym_generate(PyObject *self, PyObject *args)
 
     size_t *used_ctxs = safe_malloc(sizeof(*used_ctxs)*max_used_ctxs, __LINE__);
     PyObject *return_list = PyList_New(0);
-    pym_generate_internal(return_list, m, s, s2, slen, s2len, used_ctxs, used_ctxs_n, max_used_ctxs);
+    generate_internal(return_list, m, s, s2, slen, s2len, used_ctxs, used_ctxs_n, max_used_ctxs);
 
     safe_free(used_ctxs, __LINE__);
     return return_list;
@@ -751,7 +796,6 @@ static PyObject *pym_data_find(PyObject *self, PyObject *args)
     }
     PyObject *pseqs = PyList_New(index);
     index = 0;
-    g_counter = 0;
     for(i = 0; i < d->seqs_len; i++) {
         if(d->seqs[i]) {
             for(j = 0; j < d->sub_seqs_len[i]; j++) {
@@ -777,7 +821,6 @@ static PyObject *pym_data_find(PyObject *self, PyObject *args)
                             "ancestors"
                         );
                     }
-                    g_counter++;
                     PyList_SetItem(pseqs, index, sdict);
                     index++;
                 }
@@ -788,9 +831,7 @@ static PyObject *pym_data_find(PyObject *self, PyObject *args)
         "data", d->data,
         "seqs", pseqs
     );
-    g_counter++;
-    printf("G_COUNTER: %lu\n", g_counter);
-    printf("CTX_LEN:%lu\n", m->ctxs_len);
+    //printf("CTX_LEN:%lu\n", m->ctxs_len);
     return found;
 }
 

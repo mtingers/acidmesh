@@ -7,6 +7,9 @@
 # define DEBUG_PRINT(x) do {} while (0)
 #endif
 
+#define True 1
+#define False 0
+
 struct file {
     FILE *fd;
     size_t size;
@@ -36,4 +39,5 @@ int bncmp(const char *s1, const char *s2, size_t s1_n, size_t s2_n);
 Tree *tree_init(void);
 Tree *tree_insert(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, size_t, size_t));
 Tree *tree_find(Tree *t, void *p, size_t plen, int (*compar)(void *, void *, size_t, size_t));
+void tree_free(Tree *t);
 #endif
