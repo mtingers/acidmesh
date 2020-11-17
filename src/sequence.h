@@ -16,8 +16,10 @@ struct sequence {
 };
 
 void sequence_dump(struct mesh *f);
+void sequence_dump_r(struct mesh *f);
 void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t depth);
+void sequence_insert_r(struct mesh *m, const char *data, size_t data_len, size_t depth);
 struct sequence *sequence_init(struct data *w, size_t depth);
 void sequence_add_parent(struct sequence *t, struct sequence *parent);
-
+void sequence_add_parent_r(struct mesh *m, struct sequence *s, struct sequence *parent);
 #endif

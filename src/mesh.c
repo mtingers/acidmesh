@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
+#include <pthread.h> 
 #include "util.h"
 #include "mesh.h"
 #include "sequence.h"
@@ -13,28 +14,46 @@
 #include "container.h"
 #include "context.h"
 
-struct mesh *mesh_init(void)
+void mesh_lock(struct mesh *m) 
 {
-    struct mesh *f = safe_malloc(sizeof(*f), __LINE__);
-    f->containers = NULL;
-    f->container_len = 0;
-    f->dt = datatree_init();
-    f->first_item = NULL;
-    f->last_item = NULL;
-    f->ctxs_len = 0;
-    f->ctxs = NULL;
-    f->total_sequence_data_refs = 0;
-    return f;
+    pthread_mutex_lock(&m->lock);
 }
 
-void link_last_contexts(struct mesh *f)
+void mesh_unlock(struct mesh *m)
 {
-    //printf("link: f->ctxs_len: %lu\n", f->ctxs_len);
-    if(f->ctxs_len > 1) {
-        //printf("    do_link: %lu <-> %lu\n", f->ctxs_len-2, f->ctxs_len-1);
-        f->ctxs[f->ctxs_len-2]->next_ctx = f->ctxs[f->ctxs_len-1];
-        f->ctxs[f->ctxs_len-1]->prev_ctx = f->ctxs[f->ctxs_len-2];
+    pthread_mutex_unlock(&m->lock);
+}
+
+struct mesh *mesh_init(void)
+{
+    struct mesh *m = safe_malloc(sizeof(*m), __LINE__);
+    if(pthread_mutex_init(&m->lock, NULL) != 0) {
+        fprintf(stderr, "ERROR: pthread_mutex_init() failed. Line:%d\n", __LINE__);
+        exit(1);
     }
+    m->containers = NULL;
+    m->container_len = 0;
+    m->dt = datatree_init();
+    m->first_item = NULL;
+    m->last_item = NULL;
+    m->ctxs_len = 0;
+    m->ctxs = NULL;
+    m->total_sequence_data_refs = 0;
+    return m;
+}
+
+void link_last_contexts(struct mesh *m)
+{
+    if(m->ctxs_len > 1) {
+        m->ctxs[m->ctxs_len-2]->next_ctx = m->ctxs[m->ctxs_len-1];
+        m->ctxs[m->ctxs_len-1]->prev_ctx = m->ctxs[m->ctxs_len-2];
+    }
+}
+void link_last_contexts_r(struct mesh *m)
+{
+    mesh_lock(m);
+    link_last_contexts(m);
+    mesh_unlock(m);
 }
 
 #ifdef TEST_FOREST

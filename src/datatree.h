@@ -35,12 +35,17 @@ void recalculate_datatree_stats_off(void);
 int recalculate_datatree_stats_get(void);
 struct data *data_init(const char *data, size_t len);
 struct datatree *datatree_init(void);
-struct data *data_insert(struct mesh *f, const char *data, size_t len);
+struct data *data_insert(struct mesh *m, const char *data, size_t len);
+struct data *data_insert_r(struct mesh *m, const char *data, size_t len);
 struct data *_data_insert(struct datatree *wb, const char *data, size_t len);
-struct data *data_find(struct mesh *f, const char *data, size_t len);
+struct data *data_find(struct mesh *m, const char *data, size_t len);
+struct data *data_find_r(struct mesh *m, const char *data, size_t len);
 void data_add_sequence(struct mesh *m, struct data *w, struct sequence *s);
+void data_add_sequence_r(struct mesh *m, struct data *w, struct sequence *s);
 void dump_datas(struct data *w, size_t indent);
+void dump_datas_r(struct mesh *m, struct data *w, size_t indent);
 void datatree_stats(struct mesh *m, int print_top_bottom);
+void datatree_stats_r(struct mesh *m, int print_top_bottom);
 int datatree_sort_cmp(const void *p1, const void *p2);
 
 #endif

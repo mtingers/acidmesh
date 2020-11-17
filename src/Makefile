@@ -5,10 +5,10 @@ CC=cc
 default: tests
 
 debug: datatree.o util.o mesh.o container.o sequence.o
-	$(CC) $(CFLAGS) util.o sequence.o context.o datatree.o container.o mesh.c -DTEST_FOREST -D DEBUG -o ../bin/test_mesh
+	$(CC) $(CFLAGS) -lpthread util.o sequence.o context.o datatree.o container.o mesh.c -DTEST_FOREST -D DEBUG -o ../bin/test_mesh
 
 tests: datatree.o util.o sequence.o context.o mesh.o container.o sequence.o
-	$(CC) $(CFLAGS) util.o sequence.o context.o datatree.o container.o mesh.c -DTEST_FOREST  -o ../bin/test_mesh
+	$(CC) $(CFLAGS) -lpthread util.o sequence.o context.o datatree.o container.o mesh.c -DTEST_FOREST  -o ../bin/test_mesh
 
 util.o: util.c util.h
 	$(CC) $(CFLAGS) -c util.c

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <string.h>
 #include "util.h"
 #include "mesh.h"
@@ -20,5 +21,13 @@ struct context *ctx_init(void)
     c->next_ctx = NULL;
     c->context_id = context_id;
     context_id++;
+    return c;
+}
+struct context *ctx_init_r(struct mesh *m)
+{
+    struct context *c;
+    mesh_lock(m);
+    c = ctx_init();
+    mesh_unlock(m);
     return c;
 }

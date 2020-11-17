@@ -10,6 +10,7 @@
 
 #include <Python.h>
 #include <time.h>
+#include <pthread.h>
 #include "util.h"
 #include "mesh.h"
 #include "sequence.h"
@@ -56,7 +57,7 @@ static PyObject *pym_datatree_stats(PyObject *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "Invalid mesh index");
         return NULL;
     }
-    datatree_stats(g_meshs[i], print_top_bottom);
+    datatree_stats_r(g_meshs[i], print_top_bottom);
     Py_RETURN_NONE;
 }
 
@@ -67,7 +68,7 @@ static PyObject *pym_dump(PyObject *self, PyObject *args)
         return NULL;
     }
     if(!check_mesh_index(i)) { return NULL; }
-    sequence_dump(g_meshs[i]);
+    sequence_dump_r(g_meshs[i]);
     Py_RETURN_NONE;
 }
 
@@ -78,7 +79,7 @@ static PyObject *pym_link_last_contexts(PyObject *self, PyObject *args)
         return NULL;
     }
     if(!check_mesh_index(i)) { return NULL; }
-    link_last_contexts(g_meshs[i]);
+    link_last_contexts_r(g_meshs[i]);
     Py_RETURN_NONE;
 }
 
@@ -110,7 +111,7 @@ static PyObject *pym_sequence_insert(PyObject *self, PyObject *args)
     }
     if(!check_mesh_index(i)) { return NULL; }
     f = g_meshs[i];
-    sequence_insert(f, s, slen, index);
+    sequence_insert_r(f, s, slen, index);
     Py_RETURN_NONE;
 }
 
@@ -403,40 +404,56 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
                     }
                     tree_insert(ctx_stats, d->seqs[depth][seq_idx], 8, ctx_stats_cmp);
                 }
-                //for(ctx_idx = 0; ctx_idx < seq->ctxs_ctx_idxen; ctx_idx++) {
                 for(ctx_idx = 0; ctx_idx < seq->ctxs_len; ctx_idx++) {
                     ctx = seq->contexts[ctx_idx];
                     hits = 0.0;
                     // all of the sequences in this context
                     int missed_words = 0;
-                    for(o = 0; o < ctx->seqs_len; o++) {
-                        sub_seq = ctx->seqs[o];
+                    //for(o = 0; o < ctx->seqs_len; o++) {
+                    for(p = 0; p < dstat_n; p++) {
+                        //sub_seq = ctx->seqs[o];
                         int found = 0;
-                        for(p = 0; p < dstat_n; p++) {
-                            if(p == dstat_idx) { continue; }
-                            //hits -= 1.0;
+                        int found_at_depth = 0;
+                        double percent_adapt = dstat[0]->percent - dstat[p]->percent;
+                        //for(p = 0; p < dstat_n; p++) {
+                        for(o = 0; o < ctx->seqs_len; o++) {
+                            sub_seq = ctx->seqs[o];
+                            //if(p == dstat_idx) { continue; }
                             if(sub_seq->data->len != dstat[p]->data_ptr->len) {
-                                missed_words++;
                                 continue;
                             }
                             if(bncmp(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len) == 0) {
                                 //hits += 1.0; // + (0.0-dstat[p]->percent);
-                                hits += 1.0 + (10.0-dstat[p]->percent); // + (0.0-dstat[p]->percent);
-                                if(sub_seq->depth == dstat_idx) {
-                                    hits += 1.5; //hits; //0.5; // how much is this worth?
+                                //hits += 1.0 + (10.0-dstat[p]->percent); // + (0.0-dstat[p]->percent);
+                                //hits += 1.0;
+                                //hits += dstat[0]->percent - dstat[p]->percent;
+                                if(sub_seq->depth == p) {
+                                    //hits += 0.25; //hits; //0.5; // how much is this worth?
+                                    found_at_depth = 1;
                                 }
                                 found = 1;
-                            } else {
-                                //hits += -dstat[p]->percent; //missed_words++;
                             }
                         }
-                        if(found < 1) {
-                            hits -= 10.0-sub_seq->data->stats_percent;
+                        if(found) {
+                            hits += 1.25 + percent_adapt;
                         }
+                        if(found_at_depth) {
+                            hits += 1.0 + percent_adapt;
+                        }
+                        if(found < 1) {
+                            hits -= 1.0;
+                            missed_words++;
+                            //hits -= 10.0-sub_seq->data->stats_percent;
+                        }
+
+                        //hits += 10.0 - ctx_idx;
                     }
+                    //hits = hits - (missed_words/2.0);
+                    //if(ctx_idx < 3)
+                    //    hits += 0.1;
                     //hits -= missed_words;
-                    da = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
-                    hits =  hits - da;
+                    //da = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
+                    //hits =  hits - da;
                     track = safe_malloc(sizeof(*track), __LINE__);
                     track->dstat_idx = dstat_idx;
                     track->depth = depth;
@@ -457,6 +474,38 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
     }
     tree_free(ctx_stats);
     qsort(tracks, tracks_n, sizeof(*tracks), tracker_sort_cmp);
+    // now rewrite the ratings scaled to highest match
+    double min_rs = 0.0;
+    int is_neg = 0;
+    if(tracks[0]->hits < 0.0) {
+        min_rs = tracks[0]->hits + (tracks[0]->hits*2);
+        is_neg = 1;
+    } else {
+        min_rs = tracks[0]->hits - (tracks[0]->hits*2);
+    }
+    //racks[tracks_n-1]->hits;
+    double max_rs = tracks[0]->hits;
+    size_t max_range = 1;
+    for(o = 0; o < tracks_n; o++) {
+        max_range = o;
+        if(tracks[o]->hits < min_rs) {
+            break;
+        }
+        double new_hits;
+        if(is_neg) {
+            new_hits = dround( (max_rs + (max_rs - tracks[o]->hits)) / max_rs, 2);
+            //new_hits = dround(tracks[o]->hits / max_rs, 2);
+        } else {
+            new_hits = dround(tracks[o]->hits / max_rs, 2);
+        }
+        tracks[o]->hits = new_hits;
+    }
+    // Free up nodes after max_range
+    for(o = max_range; o < tracks_n; o++) {
+        safe_free(tracks[o], __LINE__);
+    }
+    tracks = safe_realloc(tracks, sizeof(*tracks)*(max_range), __LINE__);
+    tracks_n = max_range;
     tw->tracks = tracks;
     tw->n = tracks_n;
     return tw;
@@ -488,6 +537,7 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
     }
     if(!check_mesh_index(i)) { return NULL; }
     m = g_meshs[i];
+    mesh_lock(m);
 
     if((dtw = stats_calc_sort(m, list_obj)) == NULL) {
         goto error_cleanup;
@@ -511,9 +561,9 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
     Py_INCREF(return_list);
     seen = safe_malloc(sizeof(*seen)*tracks_n*2, __LINE__);
     if(tracks[0]->hits < 0.0) {
-        min_rating = 2 * (tracks[0]->hits / 2.0 + tracks[0]->hits);
+        min_rating = 4 * (tracks[0]->hits / 2.0 + tracks[0]->hits);
     } else {
-        min_rating = 2 * (tracks[0]->hits  / 2.0 - tracks[0]->hits);
+        min_rating = 4 * (tracks[0]->hits  / 2.0 - tracks[0]->hits);
     }
     // Build the return value list::dict
     for(i = 0; i < tracks_n; i++) {
@@ -617,6 +667,7 @@ cleanup:
             safe_free(tracks[i], __LINE__);
         safe_free(tracks, __LINE__);
     }
+    mesh_unlock(m);
     if(error) {
         goto error_cleanup_final;
     }
@@ -792,7 +843,7 @@ static PyObject *pym_data_find(PyObject *self, PyObject *args)
     }
     if(!check_mesh_index(i)) { return NULL; }
     m = g_meshs[i];
-    struct data *d = data_find(m, s, slen);
+    struct data *d = data_find_r(m, s, slen);
     if(!d) {
         Py_RETURN_NONE;
     }

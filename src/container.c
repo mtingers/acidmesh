@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
 #include "util.h"
 #include "sequence.h"
 #include "mesh.h"
@@ -39,3 +40,9 @@ void dump_container(struct container *c, size_t depth, size_t indent)
     }
 }
 
+void dump_container_r(struct mesh *m, struct container *c, size_t depth, size_t indent)
+{
+    mesh_lock(m);
+    dump_container(c, depth, indent);
+    mesh_unlock(m);
+}

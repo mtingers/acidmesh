@@ -14,5 +14,6 @@ struct context {
 };
 
 struct context *ctx_init(void);
+struct context *ctx_init_r(struct mesh *m);
 
 #endif

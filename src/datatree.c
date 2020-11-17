@@ -3,21 +3,22 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
 #include "util.h"
 #include "sequence.h"
 #include "datatree.h"
 #include "mesh.h"
 
-static int g_recalculate_datatree_stats = 1;
+static int g_recalculate_datatree_stats = True;
 
 void recalculate_datatree_stats_on(void)
 {
-    g_recalculate_datatree_stats = 1;
+    g_recalculate_datatree_stats = True;
 }
 
 void recalculate_datatree_stats_off(void)
 {
-    g_recalculate_datatree_stats = 1;
+    g_recalculate_datatree_stats = False;
 }
 
 int recalculate_datatree_stats_get(void)
@@ -94,10 +95,24 @@ void data_add_sequence(struct mesh *m, struct data *w, struct sequence *s)
         w->sub_seqs_len[s->depth]++;
     }
 }
-
-struct data *data_insert(struct mesh *f, const char *data, size_t len)
+void data_add_sequence_r(struct mesh *m, struct data *w, struct sequence *s)
 {
-    return _data_insert(f->dt, data, len);
+    mesh_lock(m);
+    data_add_sequence(m, w, s);
+    mesh_unlock(m);
+}
+struct data *data_insert(struct mesh *m, const char *data, size_t len)
+{
+    return _data_insert(m->dt, data, len);
+}
+
+struct data *data_insert_r(struct mesh *m, const char *data, size_t len)
+{
+    struct data *d;
+    mesh_lock(m);
+    d = _data_insert(m->dt, data, len);
+    mesh_unlock(m);
+    return d;
 }
 
 struct data *_data_insert(struct datatree *dt, const char *data, size_t len)
@@ -147,7 +162,14 @@ struct data *data_find(struct mesh *f, const char *data, size_t len)
     }
     return NULL;
 }
-
+struct data *data_find_r(struct mesh *m, const char *data, size_t len)
+{
+    struct data *d;
+    mesh_lock(m);
+    d = data_find(m, data, len);
+    mesh_unlock(m);
+    return d;
+}
 void dump_datas(struct data *w, size_t indent)
 {
     size_t i = 0;
@@ -161,6 +183,12 @@ void dump_datas(struct data *w, size_t indent)
     if(w->right) {
         dump_datas(w->right, indent+1);
     }
+}
+void dump_datas_r(struct mesh *m, struct data *w, size_t indent)
+{
+    mesh_lock(m);
+    dump_datas(w, indent);
+    mesh_unlock(m);
 }
 
 void _datatree_stats(struct data *cur, struct datatree_stat **stats, size_t *stats_n)
@@ -201,11 +229,11 @@ void datatree_stats(struct mesh *m, int print_top_bottom)
     struct datatree_stat **stats = safe_malloc(sizeof(*stats)*(m->dt->count), __LINE__);
     size_t stats_n = 0;
     size_t i = 0;
-    if(g_recalculate_datatree_stats) {
+    if(recalculate_datatree_stats_get()) {
         _datatree_stats(cur, stats, &stats_n);
         qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
     }
-    g_recalculate_datatree_stats = 0;
+    recalculate_datatree_stats_off();
     for(i = 0; i < stats_n; i++) {
         stats[i]->percent = (double)stats[i]->count/(double)m->total_sequence_data_refs * 100.0;
         stats[i]->data_ptr->stats_percent = stats[i]->percent;
@@ -223,3 +251,9 @@ void datatree_stats(struct mesh *m, int print_top_bottom)
     }
 }
 
+void datatree_stats_r(struct mesh *m, int print_top_bottom)
+{
+    mesh_lock(m);
+    datatree_stats(m, print_top_bottom);
+    mesh_unlock(m);
+}

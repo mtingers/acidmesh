@@ -10,5 +10,6 @@ struct container {
 
 struct container *container_init(void);
 void dump_container(struct container *c, size_t depth, size_t indent);
+void dump_container_r(struct mesh *m, struct container *c, size_t depth, size_t indent);
 
 #endif

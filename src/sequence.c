@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
+#include <pthread.h>
 #include "util.h"
 #include "sequence.h"
 #include "datatree.h"
@@ -53,6 +54,12 @@ void sequence_dump(struct mesh *f)
     printf("Total datas: %lu\n", f->dt->count-1);
     printf("Total contexts:%lu\n", f->ctxs_len-1);
 }
+void sequence_dump_r(struct mesh *m)
+{
+    mesh_lock(m);
+    sequence_dump(m);
+    mesh_unlock(m);
+}
 
 void sequence_add_parent(struct sequence *s, struct sequence *parent)
 {
@@ -93,6 +100,12 @@ void sequence_add_parent(struct sequence *s, struct sequence *parent)
     exit(1);
 }
 
+void sequence_add_parent_r(struct mesh *m, struct sequence *s, struct sequence *parent)
+{
+    mesh_lock(m);
+    sequence_add_parent(s, parent);
+    mesh_unlock(m);
+}
 // TODO: Maybe break up into smaller functions, but might actually end up being
 // harder to understand.
 void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t depth)
@@ -317,4 +330,9 @@ void sequence_insert(struct mesh *f, const char *data, size_t data_len, size_t d
     return_seq->ctxs_len++;
 }
 
-
+void sequence_insert_r(struct mesh *m, const char *data, size_t data_len, size_t depth)
+{
+    mesh_lock(m);
+    sequence_insert(m, data, data_len, depth);
+    mesh_unlock(m);
+}
