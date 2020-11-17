@@ -39,6 +39,7 @@ struct mesh *mesh_init(void)
     m->ctxs_len = 0;
     m->ctxs = NULL;
     m->total_sequence_data_refs = 0;
+    m->dt_stats_top = 0.0;
     return m;
 }
 

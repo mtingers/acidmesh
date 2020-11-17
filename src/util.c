@@ -94,6 +94,18 @@ struct file *file_open(const char *path, const char *mode, int exit_on_error)
     return f;
 }
 
+double bncmp_ratio(const char *s1, const char *s2, size_t s1_n, size_t s2_n)
+{
+    double result = s1_n - s2_n;
+    size_t i = 0;
+    size_t min_n = (s1_n > s2_n) ? s2_n : s1_n;
+
+    for(; i < min_n; i++) {
+        result += s1[i] - s2[i];
+    }
+    return result;
+}
+
 int bncmp(const char *s1, const char *s2, size_t s1_n, size_t s2_n)
 {
     size_t i = 0;

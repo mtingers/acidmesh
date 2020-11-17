@@ -191,6 +191,21 @@ void dump_datas_r(struct mesh *m, struct data *w, size_t indent)
     mesh_unlock(m);
 }
 
+
+void datatree_stats_maybe_free(struct mesh *m)
+{
+    return;
+    size_t i = 0;
+    /*if(m->dt_stats) {
+        for(i = 0; i < m->dt_stats_len; i++) {
+            safe_free(m->dt_stats[i], __LINE__);
+        }
+        safe_free(m->dt_stats, __LINE__);
+        m->dt_stats = NULL;
+        m->dt_stats_len = 0;
+    }*/
+}
+
 void _datatree_stats(struct data *cur, struct datatree_stat **stats, size_t *stats_n)
 {
     size_t n = *stats_n;
@@ -222,7 +237,6 @@ int datatree_sort_cmp(const void *p1, const void *p2)
     }
     return 0;
 }
-
 void datatree_stats(struct mesh *m, int print_top_bottom)
 {
     struct data *cur = m->dt->datas;
@@ -230,6 +244,7 @@ void datatree_stats(struct mesh *m, int print_top_bottom)
     size_t stats_n = 0;
     size_t i = 0;
     if(recalculate_datatree_stats_get()) {
+        //datatree_stats_maybe_free(m);
         _datatree_stats(cur, stats, &stats_n);
         qsort(stats, stats_n, sizeof(*stats), datatree_sort_cmp);
     }
@@ -238,7 +253,10 @@ void datatree_stats(struct mesh *m, int print_top_bottom)
         stats[i]->percent = (double)stats[i]->count/(double)m->total_sequence_data_refs * 100.0;
         stats[i]->data_ptr->stats_percent = stats[i]->percent;
         stats[i]->data_ptr->stats_count = stats[i]->count;
+        m->dt_stats_top = stats[i]->percent;
     }
+    //m->dt_stats_top = 0.0; //stats[stats_n-1]->percent;
+    //m->dt_stats_top = stats[stats_n-1]->data_ptr->stats_percent;
     if(print_top_bottom > 0) {
         printf("---- top ----\n");
         for(i = stats_n-1; i > stats_n-125; i--) {

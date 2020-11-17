@@ -12,6 +12,7 @@ struct mesh {
     struct context **ctxs;
     int ctx_use_prev;
     size_t total_sequence_data_refs;
+    double dt_stats_top;
 };
 
 void mesh_lock(struct mesh *m);

@@ -28,6 +28,7 @@ struct datatree_stat {
     struct data *data_ptr;
     size_t count;
     double percent;
+    size_t pos;
 };
 
 void recalculate_datatree_stats_on(void);

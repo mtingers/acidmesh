@@ -22,22 +22,6 @@ def fixup_reddit(txt):
 
 def build(max_n):
     mesh = Mesh()
-
-    sentences = (
-        ('Where', 'are', 'we?'),
-        ("Hello,", "world!"),
-        ("Hello,", "how", "are", "you?"),
-        ('What', 'time', 'is', 'it?'),
-        ('It', 'is', 'five.'),
-    )
-
-    for sentence in sentences:
-        depth = 0
-        for word in sentence:
-            mesh.sequence_insert(word, depth)
-            depth += 1
-        #mesh.link_last_contexts()
-
     #files = glob.glob('{}/*.dl'.format(sys.argv[1]))
     #files = glob.glob('{}/*.dl'.format('../test-data/wiki-dl'))
     dl_paths = ['../test-data/wiki-dl', '../test-data/reddit/reddit-dl']
@@ -65,7 +49,8 @@ def build(max_n):
                     if word.strip():
                         mesh.sequence_insert(word, depth)
                         depth += 1
-                mesh.link_last_contexts()
+                if depth % 2 == 0:
+                    mesh.link_last_contexts()
             if n > max_n:
                 break
 

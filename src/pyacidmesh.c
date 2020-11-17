@@ -264,12 +264,6 @@ Ideas:
 
  */
 struct tracker {
-    // TODO: relabel these so they are undsertandable
-    // t->l = t->ctx_idx;
-    // t->k = t->seq_idx;
-    // t->j = t->depth;
-    // t->i = t->dstat_idx;
-    //size_t i, j, k, l, o, p;
     size_t dstat_idx;
     size_t depth;
     size_t seq_idx;
@@ -347,12 +341,16 @@ static struct datatree_stat_wrapper *stats_calc_sort(struct mesh *m, PyObject *l
             dstat[dstat_n]->data_ptr = d;
             dstat[dstat_n]->count = d->stats_count;
             dstat[dstat_n]->percent = d->stats_percent;
+            dstat[dstat_n]->pos = n;
             dstat_n++;
         }
         safe_free(line, __LINE__);
         line = NULL;
     }
     qsort(dstat, dstat_n, sizeof(*dstat), datatree_sort_cmp);
+    //for(n = 0; n < dstat_n; n++) {
+    //    printf("dstat: %s percent:%.2f pos:%lu\n", dstat[n]->data_ptr->data, dstat[n]->percent, dstat[n]->pos);
+    //}
     dtw->n = dstat_n;
     dtw->dstat = dstat;
     return dtw;
@@ -365,7 +363,7 @@ error_cleanup:
     return NULL;
 }
 
-static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat, size_t dstat_n)
+static struct tracker_wrapper *calc_context_scores(struct mesh *m, struct datatree_stat **dstat, size_t dstat_n)
 {
     struct tracker_wrapper *tw = safe_malloc(sizeof(*tw), __LINE__);
     struct tracker *track = NULL;
@@ -408,52 +406,47 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
                     ctx = seq->contexts[ctx_idx];
                     hits = 0.0;
                     // all of the sequences in this context
-                    int missed_words = 0;
-                    //for(o = 0; o < ctx->seqs_len; o++) {
+                    int found_at_depth = 0;
                     for(p = 0; p < dstat_n; p++) {
-                        //sub_seq = ctx->seqs[o];
                         int found = 0;
-                        int found_at_depth = 0;
-                        double percent_adapt = dstat[0]->percent - dstat[p]->percent;
+                        double distance = 0.0;
                         //for(p = 0; p < dstat_n; p++) {
                         for(o = 0; o < ctx->seqs_len; o++) {
                             sub_seq = ctx->seqs[o];
-                            //if(p == dstat_idx) { continue; }
                             if(sub_seq->data->len != dstat[p]->data_ptr->len) {
                                 continue;
                             }
                             if(bncmp(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len) == 0) {
-                                //hits += 1.0; // + (0.0-dstat[p]->percent);
-                                //hits += 1.0 + (10.0-dstat[p]->percent); // + (0.0-dstat[p]->percent);
-                                //hits += 1.0;
-                                //hits += dstat[0]->percent - dstat[p]->percent;
-                                if(sub_seq->depth == p) {
-                                    //hits += 0.25; //hits; //0.5; // how much is this worth?
-                                    found_at_depth = 1;
+                                if(sub_seq->depth == dstat[p]->pos) {
+                                    found_at_depth++;
+                                    //printf("TEST: %.2f\n", m->dt_stats_top);
                                 }
-                                found = 1;
+                                hits += m->dt_stats_top - dstat[p]->percent;
+                                int tmp = dstat[p]->pos - sub_seq->depth;
+                                if(tmp < 0) {
+                                    distance = distance - tmp;
+                                } else {
+                                    distance = distance + tmp;
+                                }
+                                found++;
                             }
                         }
-                        if(found) {
-                            hits += 1.25 + percent_adapt;
-                        }
-                        if(found_at_depth) {
-                            hits += 1.0 + percent_adapt;
-                        }
+                        hits += found + found_at_depth;
+                        hits -= distance;
                         if(found < 1) {
-                            hits -= 1.0;
-                            missed_words++;
-                            //hits -= 10.0-sub_seq->data->stats_percent;
+                            hits -= 5.0;
                         }
-
-                        //hits += 10.0 - ctx_idx;
                     }
-                    //hits = hits - (missed_words/2.0);
-                    //if(ctx_idx < 3)
-                    //    hits += 0.1;
-                    //hits -= missed_words;
-                    //da = dabs((double)dstat_n - (double)ctx->seqs_len); // / 1.25;
-                    //hits =  hits - da;
+                    if(found_at_depth == dstat_n) {
+                        //printf("hit exact-----------------------<\n");
+                        /*for(o = 0; o < ctx->seqs_len; o++) {
+                            sub_seq = ctx->seqs[o];
+                            printf("%s ", sub_seq->data->data);
+                        }
+                        printf("\n");
+                        */
+                        hits += 5.0; // + percent_adapt;
+                    }
                     track = safe_malloc(sizeof(*track), __LINE__);
                     track->dstat_idx = dstat_idx;
                     track->depth = depth;
@@ -473,7 +466,10 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
         }
     }
     tree_free(ctx_stats);
-    qsort(tracks, tracks_n, sizeof(*tracks), tracker_sort_cmp);
+    if(tracks) {
+        qsort(tracks, tracks_n, sizeof(*tracks), tracker_sort_cmp);
+    } 
+    /*
     // now rewrite the ratings scaled to highest match
     double min_rs = 0.0;
     int is_neg = 0;
@@ -506,6 +502,7 @@ static struct tracker_wrapper *calc_context_scores(struct datatree_stat **dstat,
     }
     tracks = safe_realloc(tracks, sizeof(*tracks)*(max_range), __LINE__);
     tracks_n = max_range;
+    */
     tw->tracks = tracks;
     tw->n = tracks_n;
     return tw;
@@ -542,21 +539,29 @@ static PyObject *pym_generate_response(PyObject *self, PyObject *args)
     if((dtw = stats_calc_sort(m, list_obj)) == NULL) {
         goto error_cleanup;
     }
+    if(!dtw->dstat) {
+        printf("!dtw-dstat\n");
+        goto cleanup;
+    }
     dstat = dtw->dstat;
     dstat_n = dtw->n;
     safe_free(dtw, __LINE__);
-
+    if(dstat_n < 1) {
+        goto cleanup;
+    }
     // Got here, the matching words were found and ordered by stat_percent
     // Now let's look at all of the contexts and rate them by count of matching
     // words and some other TBD calculations
     // tracks
-    if((tracks_wrap = calc_context_scores(dstat, dstat_n)) == NULL) {
+    if((tracks_wrap = calc_context_scores(m, dstat, dstat_n)) == NULL) {
         goto error_cleanup;
     }
     tracks = tracks_wrap->tracks;
     tracks_n = tracks_wrap->n;
     safe_free(tracks_wrap, __LINE__);
-
+    if(tracks_n < 1) {
+        goto cleanup;
+    }
     PyObject *return_list = PyList_New(0);
     Py_INCREF(return_list);
     seen = safe_malloc(sizeof(*seen)*tracks_n*2, __LINE__);
@@ -657,7 +662,7 @@ error_cleanup:
 
 cleanup:
     if(seen) { safe_free(seen, __LINE__); }
-    if(dstat) {
+    if(dstat_n > 0) {
         for(i = 0; i < dstat_n; i++)
             safe_free(dstat[i], __LINE__);
         safe_free(dstat, __LINE__);
@@ -670,6 +675,9 @@ cleanup:
     mesh_unlock(m);
     if(error) {
         goto error_cleanup_final;
+    }
+    if(dstat_n < 1) {
+        Py_RETURN_NONE;
     }
     return return_list;
 
