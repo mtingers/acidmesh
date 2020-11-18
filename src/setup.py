@@ -24,7 +24,7 @@ def main():
         ],
         ext_modules=[
             Extension('cacidmesh',
-                sources=['pyacidmesh.c', 'sequence.c', 'container.c', 'context.c', 'mesh.c', 'util.c', 'datatree.c'],
+                sources=['pyacidmesh.c', 'sequence.c', 'container.c', 'context.c', 'mesh.c', 'util.c', 'datatree.c', 'levenshtein.c'],
             )
         ]
     )

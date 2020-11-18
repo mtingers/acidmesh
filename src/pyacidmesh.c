@@ -17,6 +17,7 @@
 #include "datatree.h"
 #include "container.h"
 #include "context.h"
+#include "levenshtein.h"
 
 static size_t g_meshs_len = 0;
 static struct mesh **g_meshs = NULL;
@@ -379,6 +380,8 @@ static struct tracker_wrapper *calc_context_scores(struct mesh *m, struct datatr
     double da = 0.0;
     size_t dstat_idx = 0, depth = 0, seq_idx = 0, ctx_idx = 0;
     size_t o = 0, p = 0;
+    unsigned int lev = 0;
+
     // This is essentially rating a context by how many matches the words have
     // within it (then gives it a rating).
     //
@@ -416,6 +419,18 @@ static struct tracker_wrapper *calc_context_scores(struct mesh *m, struct datatr
                             if(sub_seq->data->len != dstat[p]->data_ptr->len) {
                                 continue;
                             }
+                            lev = levenshtein_distance(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len);
+                            if(lev == 0.0) {
+                                found++;
+                                hits += 1.0;
+                                if(sub_seq->depth == dstat[p]->pos) {
+                                    found_at_depth++;
+                                }
+                                //hits += m->dt_stats_top - dstat[p]->percent;
+                            } else {
+                                hits += 0.0 - (double)lev;
+                            }
+                            /*
                             if(bncmp(sub_seq->data->data, dstat[p]->data_ptr->data, sub_seq->data->len, dstat[p]->data_ptr->len) == 0) {
                                 if(sub_seq->depth == dstat[p]->pos) {
                                     found_at_depth++;
@@ -429,12 +444,13 @@ static struct tracker_wrapper *calc_context_scores(struct mesh *m, struct datatr
                                     distance = distance + tmp;
                                 }
                                 found++;
-                            }
+                            }*/
                         }
-                        hits += found + found_at_depth;
-                        hits -= distance;
+                        //hits += found + found_at_depth;
+                        //hits -= distance;
                         if(found < 1) {
-                            hits -= 5.0;
+                            hits -= dstat_n; //5.0;
+                            //hits -= 5.0;
                         }
                     }
                     if(found_at_depth == dstat_n) {
@@ -445,7 +461,8 @@ static struct tracker_wrapper *calc_context_scores(struct mesh *m, struct datatr
                         }
                         printf("\n");
                         */
-                        hits += 5.0; // + percent_adapt;
+                        //hits += 5.0; // + percent_adapt;
+                        hits += dstat_n; // + percent_adapt;
                     }
                     track = safe_malloc(sizeof(*track), __LINE__);
                     track->dstat_idx = dstat_idx;

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "levenshtein.h" 
+#include "levenshtein.h"
 
 typedef enum {
     INSERTION,
@@ -10,7 +10,7 @@ typedef enum {
     SUBSTITUTION,
     NONE
 } edit_type;
- 
+
 struct edit {
     unsigned int score;
     edit_type type;
@@ -20,7 +20,7 @@ struct edit {
     struct edit *prev;
 };
 typedef struct edit edit;
- 
+
 static int min3(int a, int b, int c)
 {
     if (a < b && a < c) {
@@ -31,7 +31,7 @@ static int min3(int a, int b, int c)
     }
     return c;
 }
- 
+
 static unsigned int levenshtein_matrix_calculate(edit **mat, const char *str1, size_t len1,
         const char *str2, size_t len2)
 {
@@ -51,7 +51,7 @@ static unsigned int levenshtein_matrix_calculate(edit **mat, const char *str1, s
             ins = mat[i][j - 1].score + 1; /* insertion */
             subst = mat[i - 1][j - 1].score + substitution_cost; /* substitution */
             best = min3(del, ins, subst);
-            mat[i][j].score = best;                  
+            mat[i][j].score = best;
             mat[i][j].arg1 = str1[i - 1];
             mat[i][j].arg2 = str2[j - 1];
             mat[i][j].pos = i - 1;
@@ -76,7 +76,7 @@ static unsigned int levenshtein_matrix_calculate(edit **mat, const char *str1, s
     }
     return mat[len1][len2].score;
 }
- 
+
 static edit **levenshtein_matrix_create(const char *str1, size_t len1, const char *str2,
         size_t len2)
 {
@@ -101,21 +101,21 @@ static edit **levenshtein_matrix_create(const char *str1, size_t len1, const cha
         mat[i][0].arg1 = 0;
         mat[i][0].arg2 = 0;
     }
- 
+
     for (j = 0; j <= len2; j++) {
         mat[0][j].score = j;
         mat[0][j].prev = NULL;
         mat[0][j].arg1 = 0;
         mat[0][j].arg2 = 0;
     }
-    return mat; 
+    return mat;
 }
- 
+
 unsigned int levenshtein_distance(const char *str1, const char *str2, size_t len1, size_t len2)
 {
     unsigned int i, distance;
     edit **mat;
- 
+
     if(len1 == 0) {
         return len2;
     }
@@ -146,4 +146,4 @@ int main(void)
     printf("%d\n", levenshtein_distance("How", "How"));
     return 0;
 }
-#endif 
+#endif

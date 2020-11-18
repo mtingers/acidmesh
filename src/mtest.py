@@ -35,8 +35,8 @@ def build(max_n):
         for n, path in enumerate(files):
             bname = os.path.basename(path)
             data = open(path, 'r').read().strip() #.split('\0')
-            if 'reddit' in dl_path:
-                data= fixup_reddit(data)
+            #if 'reddit' in dl_path:
+            #    data= fixup_reddit(data)
             data = data.split('\0')
             #print(data)
             #sp = re.split('(([a-z])([\.\!\?])|([0-9])([\.\!\?]\s))', txt)

@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
-#include <pthread.h> 
+#include <pthread.h>
 #include "util.h"
 #include "mesh.h"
 #include "sequence.h"
@@ -14,7 +14,7 @@
 #include "container.h"
 #include "context.h"
 
-void mesh_lock(struct mesh *m) 
+void mesh_lock(struct mesh *m)
 {
     pthread_mutex_lock(&m->lock);
 }
@@ -57,7 +57,7 @@ void link_last_contexts_r(struct mesh *m)
     mesh_unlock(m);
 }
 
-#ifdef TEST_FOREST
+#ifdef TEST_MESH
 #define BUF_SIZE 1024*1024*4
 void test_mesh(const char *data_directory)
 {

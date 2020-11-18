@@ -241,8 +241,6 @@ void tree_free_copied(Tree *t)
     safe_free(t, __LINE__);
 }
 
-
-
 void tree_free(Tree *t)
 {
     if(t->left) {
@@ -253,5 +251,4 @@ void tree_free(Tree *t)
     }
     safe_free(t, __LINE__);
 }
-
 
