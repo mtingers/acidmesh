@@ -118,6 +118,6 @@ data structures to on-disk format (e.g. pointers become encoded integers and
 reference offsets of a file). Make this a selectable option (select: memory
 and/or disk). Might cause a headache moving pointers in other locations.
 - [ ] Swap out basic binary tree for self-balancing or something more performant.
-- [x] Direct Python module integration.
+- [x] Python C extension
 
 
